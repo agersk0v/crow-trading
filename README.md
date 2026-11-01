@@ -1,8 +1,9 @@
 # Crow Trading
 
 Local Python research and paper trading for crypto and stock strategies. The
-current implementation fetches, validates, and caches daily historical data.
-See [data commands and contracts](doc/data.md). Trading is not implemented.
+current implementation caches daily historical data and evaluates momentum
+and mean-reversion signal intents offline. See [data commands](doc/data.md) and
+[strategy rules and commands](doc/strategies.md). Trading is not implemented.
 Read [AGENTS.md](AGENTS.md) and the [implementation plan](doc/implementation.md)
 before making changes. Work through issues and PRs; only the human user merges.
 
