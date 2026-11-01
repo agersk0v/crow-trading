@@ -5,7 +5,8 @@ current implementation caches daily historical data, scans watchlists for daily
 strategy signals, and simulates historical single-asset trades offline.
 See [data commands](doc/data.md), [strategy rules](doc/strategies.md),
 [backtesting](doc/backtesting.md), and [daily scanning/scheduling](doc/scanner.md).
-Paper/live execution is not implemented.
+Local [paper trading](doc/paper.md) uses simulated accounts and orders. Live
+execution is not implemented.
 Read [AGENTS.md](AGENTS.md) and the [implementation plan](doc/implementation.md)
 before making changes. Work through issues and PRs; only the human user merges.
 
@@ -69,3 +70,18 @@ can be invoked every 15 minutes and skips unchanged candles without downloading
 or reporting them again. Read [scanner setup](doc/scanner.md) for the offline
 demo, watchlist fields, expiry/revision rules, recovery, and Windows Task Scheduler
 instructions. No schedule is installed automatically and no orders are placed.
+
+## Test local paper trading
+
+```sh
+uv run --locked python examples/paper/demo.py --output data/paper-demo
+uv run --locked python -m crow_trading.paper inspect --state data/paper-demo/paper-state --section fills
+```
+
+This synthetic example exercises a restart-tested buy/sell cycle and exports a
+reconciled ledger; it does not demonstrate investment performance. For public
+scanner signals, review `examples/paper/paper.json`, run `paper init` and then
+`paper step` with that path. The example gives each strategy its own virtual
+EUR 1,000 account and enables BTC/EUR only. Read [paper setup, timing, stop/resume,
+and recovery](doc/paper.md) before scheduling it. Existing scanner tasks do not
+automatically run the paper worker. No real orders or broker credentials exist.

@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "mode": "paper",
+  "fill_policy": "next_closed_daily_open",
+  "state_dir": "../../data/paper",
+  "watchlist": "../scanner/watchlist.json",
+  "fx_snapshot": "eur-identity.json",
+  "accounts": [
+    {
+      "name": "momentum",
+      "strategy": {
+        "id": "momentum",
+        "version": "1",
+        "parameters": {
+          "entry_lookback": 20,
+          "exit_lookback": 10
+        }
+      },
+      "settings": {
+        "account_currency": "EUR",
+        "initial_cash": "1000",
+        "target_eur": "50",
+        "max_position_eur": "50",
+        "max_exposure": "0.25",
+        "max_loss": "0.1",
+        "max_drawdown": "0.1",
+        "delivery_delay_seconds": 0,
+        "fx_max_age_hours": 96,
+        "costs": {
+          "fee_rate": "0.0026",
+          "fixed_fee_quote": "0",
+          "spread_bps": "10",
+          "slippage_bps": "5",
+          "quantity_step": "0.00000001",
+          "minimum_quantity": "0.00000001",
+          "minimum_notional_quote": "1"
+        }
+      },
+      "max_positions": 5,
+      "mark_max_age_seconds": 345600,
+      "signal_max_age_seconds": 64800,
+      "assets": [
+        {
+          "name": "btc-eur",
+          "costs": {
+            "fee_rate": "0.0026",
+            "fixed_fee_quote": "0",
+            "spread_bps": "10",
+            "slippage_bps": "5",
+            "quantity_step": "0.00000001",
+            "minimum_quantity": "0.00000001",
+            "minimum_notional_quote": "1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mean-reversion",
+      "strategy": {
+        "id": "mean-reversion",
+        "version": "1",
+        "parameters": {
+          "lookback": 20,
+          "entry_deviation": 0.05
+        }
+      },
+      "settings": {
+        "account_currency": "EUR",
+        "initial_cash": "1000",
+        "target_eur": "50",
+        "max_position_eur": "50",
+        "max_exposure": "0.25",
+        "max_loss": "0.1",
+        "max_drawdown": "0.1",
+        "delivery_delay_seconds": 0,
+        "fx_max_age_hours": 96,
+        "costs": {
+          "fee_rate": "0.0026",
+          "fixed_fee_quote": "0",
+          "spread_bps": "10",
+          "slippage_bps": "5",
+          "quantity_step": "0.00000001",
+          "minimum_quantity": "0.00000001",
+          "minimum_notional_quote": "1"
+        }
+      },
+      "max_positions": 5,
+      "mark_max_age_seconds": 345600,
+      "signal_max_age_seconds": 64800,
+      "assets": [
+        {
+          "name": "btc-eur",
+          "costs": {
+            "fee_rate": "0.0026",
+            "fixed_fee_quote": "0",
+            "spread_bps": "10",
+            "slippage_bps": "5",
+            "quantity_step": "0.00000001",
+            "minimum_quantity": "0.00000001",
+            "minimum_notional_quote": "1"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 - [Product](doc/product.md): scope and acceptance criteria.
 - [Architecture](doc/architecture.md): boundaries and data rules.
 - [Implementation](doc/implementation.md): ordered tasks.
-- Current state: historical data, pure strategies, daily watchlist scanning, and offline single-asset backtesting. See [scanner contracts](doc/scanner.md). Paper execution is not implemented. See [backtesting limits](doc/backtesting.md).
+- Current state: historical data, pure strategies, daily watchlist scanning, and offline single-asset backtesting. See [scanner contracts](doc/scanner.md). Local paper trading is implemented with simulated accounts/orders only; see [paper contracts](doc/paper.md). See [backtesting limits](doc/backtesting.md).
 
 ## GitHub rules
 - Use GitHub issues and pull requests for all changes.
@@ -20,7 +20,7 @@
 - Pin dependencies and document reproducible commands.
 - Add tests for behavior changes. Run available lint, type checks, and relevant tests; report failures and checks not run.
 - Update README and relevant `doc/` files in every implementation PR. Keep `doc/implementation.md` and this file current; state unsupported scenarios explicitly.
-- Do not silently alter datasets, frozen experiment plans, or published results. Bump strategy/engine/scanner versions when their rules or semantics change.
+- Do not silently alter datasets, frozen experiment plans, or published results. Bump strategy/engine/scanner/paper versions when their rules or semantics change.
 
 ## Safety rules
 - Research and paper trading only. Do not enable live orders or connect production broker credentials without a separate explicit user request.
