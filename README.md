@@ -1,7 +1,8 @@
 # Crow Trading
 
 Local Python research and paper trading for crypto and stock strategies. The
-current implementation is a package skeleton; no data ingestion or trading runs.
+current implementation fetches, validates, and caches daily historical data.
+See [data commands and contracts](doc/data.md). Trading is not implemented.
 Read [AGENTS.md](AGENTS.md) and the [implementation plan](doc/implementation.md)
 before making changes. Work through issues and PRs; only the human user merges.
 
@@ -24,13 +25,13 @@ uv run --locked pytest
 
 `uv sync` creates `.venv` and installs the package and development tools. uv uses
 `.python-version` to select Python 3.12 and can download it if needed. No API keys,
-broker credentials, services, or market data are required. The test verifies the
-installed distribution and typed-package marker.
+broker credentials, services, or market data are required. Tests verify package installation, provider adapters, validation, and storage
+using offline fixtures. Public-provider smoke checks are documented separately.
 
 `pyproject.toml` pins development tools; `uv.lock` locks transitive dependencies.
 After an intentional dependency change, run `uv lock`, review the lockfile diff,
-and rerun the checks. Do not manually edit the lockfile. Runtime dependencies are
-empty until later implementation phases require them.
+and rerun the checks. Do not manually edit the lockfile. Runtime dependencies include CCXT, yfinance, pandas, exchange-calendars, and
+pyarrow. Default tests require no network or credentials.
 
 GitHub Actions runs these same checks on Python 3.12. Keep local data under the
 ignored `data/` directory and secrets in environment variables or an ignored
