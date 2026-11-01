@@ -1,41 +1,39 @@
-# Crow Trading: Product Requirements
+# Product
 
-## Vision
-Crow Trading is a **personal quantitative research and paper-trading tool** for testing short-term swing-trading hypotheses on cryptocurrency and stocks. The intended user is a solo Python developer in Denmark, experimenting with positions of roughly **€50** and willing to wait hours or days for a valid setup.
+## Goal
+Compare crypto and stock swing strategies after realistic costs. Support local research and paper trading for a Danish user. Finding no edge is a valid result.
 
-**The goal is to find out whether any tested approach has a repeatable, meaningful edge after fees, spreads, slippage, and relevant tax considerations. Profit is not guaranteed.**
+## Current capabilities
+- Public daily market-data ingestion, validation, and immutable Parquet caches.
+- Pure momentum and mean-reversion intents with causal historical replay.
+- Offline single-asset backtests with costs, FX, risk checks, isolated evaluation windows, ledger, benchmarks, and charts.
+- Stock simulation supports unadjusted prices only and requires a complete no-corporate-action coverage snapshot. Splits/dividends and adjusted-price fills are rejected, not ignored.
+- FX uses explicit timestamped snapshots; no rates or corporate-action facts are invented. Demo datasets/rates are synthetic and do not measure investment performance.
+- No watchlist scanning, scheduling, notifications, paper execution, or live trading yet.
 
-## Target users and use cases
-- Research and compare crypto pairs (initially BTC/EUR and ETH/EUR) and selected liquid stocks on the same analytical basis.
-- Download and cache historical OHLCV data with documented provenance and limitations.
-- Backtest simple long-only swing strategies over multiple market regimes and timeframes.
-- Compare each experiment against a suitable buy-and-hold or cash benchmark.
-- Simulate entries and exits at approximately €50 per position without spending real funds.
-- Review trades, net results, maximum drawdown, win/loss distribution, costs, and parameter sensitivity.
-- Export a complete trade ledger to assist with independent Danish tax reporting.
+See [data](data.md), [strategies](strategies.md), and [backtesting](backtesting.md) for commands and precise limitations.
 
-## Core product requirements (MVP)
-1. **Market data:** crypto through CCXT/exchange sources; stock research data through yfinance initially. Flag restrictions on Kraken historical candles and yfinance intraday history. Store UTC timestamps, original source metadata, and adjusted/unadjusted pricing status.
-2. **Unified strategy interface:** identical strategy logic accepts market-agnostic candle input; signal calculations must use only information known at the time.
-3. **Two baseline strategies:** a momentum/breakout variant and a mean-reversion/pullback variant, both explicitly specified before evaluation. No parameter mining disguised as validation.
-4. **Backtesting:** fixed initial capital, cash accounting, configurable €50 notional target, whole/fractional quantity constraints, commissions, spread, slippage, and realistic execution timing.
-5. **Evaluation:** full trade ledger; total/annualized returns when meaningful, benchmark comparison, max drawdown, exposure, turnover, profit factor, and sample counts; data splits for train/validation/untouched out-of-sample tests.
-6. **Paper trading:** same strategy signal and risk-check interfaces with simulated execution; no external trade credentials required.
-7. **Safeguards:** live trading disabled, leverage/shorting disabled, explicit data freshness checks, configurable order/exposure/loss caps.
-8. **Tax awareness:** preserve trade-level quantities, prices, transaction fees, asset identifiers, timestamps, and EUR/DKK conversion data. Provide only separately labeled, assumptions-based after-tax estimates.
+## MVP requirements
+- Assets: BTC/EUR, ETH/EUR, and a small liquid stock sample.
+- Start with daily bars; add intraday only when history and data quality support it.
+- Ingest crypto through CCXT/exchange archives and stocks through yfinance for research.
+- Validate and cache UTC OHLCV with source, adjustment, and completeness metadata.
+- Run the same pure momentum-breakout and mean-reversion strategies on both markets.
+- Simulate long-only positions targeting €50 each, with configurable capital and risk limits.
+- Model fees, spread, slippage, cash, trading calendars, quantity precision, corporate actions, and FX.
+- Evaluate predeclared parameters using training, validation, and untouched test periods.
+- Report gross/net P&L, meaningful annualized returns, drawdown, exposure, turnover, profit factor, trade counts, win/loss statistics, and buy-and-hold/cash benchmarks.
+- Paper trading must reuse strategy, risk, and ledger contracts; require no trading credentials.
+- Export fills, quantities, prices, fees, asset IDs, timestamps, realized P&L, and FX provenance for EUR/DKK tax records. Keep tax scenarios separate from investment results.
 
-## Not in MVP
-- Live broker orders, automated deposits/withdrawals, leverage, derivatives, social/copy trading, high-frequency trading, AI-driven price predictions, portfolio optimization, hosted infrastructure, or guarantees of quick cash.
-- Filing tax returns or asserting definitive asset-specific Danish tax treatment.
+## Acceptance
+- Fetch, validate, cache, and reload both crypto pairs and at least one stock with provenance.
+- Produce reproducible reports: trades CSV, configuration, dataset fingerprints, metrics, and drawdown chart.
+- Test closed candles, look-ahead prevention, position caps, empty/missing data, non-trading days, and fees.
+- Paper execution survives restarts without duplicate orders or real-money trades.
 
-## Success criteria
-- Reproducibly download, validate, cache, and reload at least one crypto and one stock daily OHLCV dataset.
-- Run the same strategy implementation on both asset classes without using broker code in the strategy.
-- Produce a fully reconcilable €50-scale trade report including all modeled costs and a benchmark.
-- Include automated tests for no look-ahead, closed candles, position caps, empty data, non-trading days, and fee calculations.
-- Demonstrate documented training/test separation; positive results are **not** a requirement for project success.
+## Excluded
+Live orders, leverage, shorting, derivatives, deposits/withdrawals, copy trading, high-frequency trading, AI price prediction, portfolio optimization, hosted infrastructure, and tax filing. See [agent rules](../AGENTS.md).
 
-## Decisions to revisit before live trading
-Broker/account eligibility in Denmark, permitted automated-trading API use, fractional shares, minimum order size, total loss budget, exact fees, supported symbols, tax treatment, and ongoing operational requirements.
-
-See [architecture.md](architecture.md) and [implementation.md](implementation.md).
+## Unresolved
+Choose stock universe/exchanges, data licensing, starting capital, loss budget, holding limits, and exact venue costs before affected experiments. Broker eligibility and live integration require a separate future request.

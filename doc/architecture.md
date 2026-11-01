@@ -1,91 +1,45 @@
-# Crow Trading: Architecture
+# Architecture
 
-## Principles
-Python-first, modular monolith, local execution, minimal infrastructure, typed boundaries, reproducible research. Separate **data ingestion**, **signal generation**, **simulation**, **risk**, and **execution**. Backtests must never call real brokers.
+## Structure
+Use a local Python modular monolith. Keep `doc/` as the canonical specification. No server or dashboard is required.
 
-## Logical flow
-```text
-  CCXT / exchange archives       yfinance / stock provider
-              |                              |
-              +---------- ingestion ---------+
-                             |
-                 normalized UTC OHLCV
-                             |
-                   validation + Parquet
-                             |
-              strategies -> signal intents
-                             |
-                       risk policy
-                             |
-             +---------------+---------------+
-             |                               |
-        backtest fills                paper fills (later)
-             |                               |
-             +---------------+---------------+
-                             |
-                   ledger + analytics
-                             |
-                    reports / exports
+Flow: sources → normalized/validated UTC OHLCV → cache → strategy signals → risk checks → simulated fills → ledger → reports.
 
-  Future only: broker adapters for Kraken and IBKR
-  must require separate explicit live-trading authorization.
-```
+Implemented modules under `src/crow_trading/`:
+- `data/`: typed candles/metadata, CCXT/yfinance adapters, calendar-aware validation, archive import, immutable Parquet storage.
+- `strategies/`: typed signal/protocol, pure momentum and mean reversion, causal replay/latest runner, offline JSON CLI.
+- `backtesting/models.py`: Decimal settings, costs, and chronological windows.
+- `backtesting/market.py`: as-of EUR-triangulated FX and corporate-action support checks.
+- `backtesting/ledger.py`, `risk.py`, `engine.py`: cash/cost basis, entry limits, close-observed risk stops, next-open simulation.
+- `backtesting/experiment.py`: frozen configuration/input hashes and protocol versions.
+- `backtesting/metrics.py`, `reports.py`: ledger/equity CSV, metrics/benchmarks JSON, and standalone SVG charts.
+- Deterministic tests in `tests/`; synthetic examples in `examples/backtesting/`.
+- Paper broker and accounting/tax integrations remain future work. No live adapters.
 
-## Modules (proposed)
-```text
-crow_trading/
-  config.py               # validated configuration; safe defaults
-  models.py               # Candle, Signal, OrderIntent, Fill, Trade
-  data/
-    crypto.py             # CCXT and optional historical archives
-    stocks.py             # yfinance research source
-    normalize.py          # UTC OHLCV schema and validation
-    storage.py            # Parquet + source metadata
-  strategies/
-    base.py               # pure strategy protocol
-    momentum.py
-    mean_reversion.py
-  backtesting/
-    engine.py             # order/fill, portfolio, cash simulation
-    metrics.py
-    reports.py
-  execution/
-    paper.py              # deterministic simulated broker
-    risk.py               # per-position, exposure and loss controls
-    # live adapters deferred until explicitly authorized
-  accounting/
-    ledger.py             # auditable trade records
-    tax_export.py         # records and FX history, not tax filing
-tests/
-docs/                     # optional generated research reports
-doc/                      # maintained project plans
-```
-The package layout is illustrative; implementation may adapt it. Keep the requested `doc/` directory as the canonical specification.
+## Contracts
+- Candle: symbol, venue/source, UTC timestamp, timeframe, OHLCV, currency, adjustment flag, completeness.
+- Signal: symbol, strategy ID/version, evaluated candle timestamp, earliest availability, entry/exit/hold intent, reason. No size or broker state.
+- Order intent: symbol, side, quantity/notional, requested timestamp, mode, idempotency key.
+- Fill: symbol, side, quantity, price, commission/currency, timestamp, venue, order ID.
+- Ledger: intent/status/reason, fills, cash/quantity deltas, balances, fees, cost basis, realized P&L, and applied FX. Equity snapshots separately record unrealized P&L and drawdown.
+- Experiment: immutable JSON plan with complete configuration, three windows, strategy/engine versions, dataset fingerprint, and input file hashes. Paths are relative to the plan.
 
-## Core data contracts
-- **Candle:** symbol, venue/source, timestamp (UTC), timeframe, open, high, low, close, volume, currency, adjusted flag, completeness.
-- **Signal:** symbol, strategy ID/version, evaluated candle timestamp, action, reason, optional target quantity; no exchange credentials.
-- **Order intent:** symbol, side, notional/quantity, requested timestamp, execution mode, idempotency key.
-- **Fill:** symbol, side, executed quantity and price, commission and currency, execution timestamp, venue, order ID.
-- **Ledger:** all fills and cash changes, cost basis inputs, FX conversion source/rate, fees, balances.
+## Invariants
+- Strategies consume validated data and return signals; never call brokers.
+- Evaluate closed candles only. Default to next-bar execution after a signal exists.
+- Never fabricate tradable candles by forward-filling missing data.
+- Handle empty data, insufficient history/cash, stale prices, wide spreads, partial fills, and rejected orders.
+- Crypto: model 24/7 trading, venue fees, minimum sizes, and quantity steps. Kraken OHLC history is limited; use archives for longer studies and cross-check venue prices.
+- Stocks: model sessions/holidays, splits, dividends, delistings, share precision, minimum commissions, adjusted prices, and USD/EUR/DKK FX. yfinance intraday history is limited.
+- Compare markets over explicit, comparable horizons. Freeze experiment parameters before untouched-test evaluation.
+- Keep tax scenarios separate; do not apply a flat tax deduction to every candle.
 
-## Market-specific behavior
-- **Crypto:** 24/7 market; exchange-specific OHLCV conventions, trading fees, minimum amounts and step sizes; Kraken OHLC history is limited, so use an archival provider for longer 4-hour studies and cross-check execution venue prices.
-- **Stocks:** exchange sessions/holidays, splits, dividends, delistings, share precision, minimum commission, USD/EUR/DKK conversion and adjusted data. yfinance is a prototyping source, not a guaranteed production-grade intraday history.
-- A daily close strategy must simulate fills **after** the signal exists. Do not assume filling at the same closing price unless modeling an order submitted before the close using only then-available information.
-- Use comparable calendars and clearly labeled measurement horizons when cross-market benchmarking.
+## Simulation limits
+Each dataset, evaluation window, and benchmark has an independent one-symbol account. No multi-asset portfolio or shared exposure accounting is implied. Indicators may warm from earlier bars, but cash and holdings reset per window. Full fills occur at eligible bar opens; no intrabar execution or guaranteed stop prices.
 
-## Backtesting integrity
-- Lock experiment definitions before looking at untouched test periods.
-- Prevent missing-data forward-fills that create fictional tradable candles.
-- Handle no fills, insufficient history, stale prices, wide spreads, and partial or rejected orders.
-- Report results both before tax and with separately estimated tax scenarios. Never subtract an arbitrary constant tax rate from portfolio equity as if tax occurred on each candle.
+Stock action coverage is mandatory. Only unadjusted, attested no-action windows are supported; splits/dividends and adjusted-price execution fail. FX snapshots must supply rates already available at each fill/mark and pass age checks. See [backtesting contracts](backtesting.md).
 
-## Security and deployment
-- Local-only for MVP; no open ports or external dashboard required.
-- Public market-data requests need no trading credentials.
-- Never store or commit secrets; live credentials, if added later, are scoped to trading without withdrawal permissions.
-- Live execution must require explicit opt-in, a disabled-by-default config flag, preflight checks, persistent order reconciliation, and a kill switch.
+## Dependencies
+Pinned runtime dependencies: CCXT, yfinance, pandas, exchange-calendars, pyarrow, and Matplotlib. Python 3.12+, Ruff, mypy, and pytest support development; `uv.lock` records transitive versions. Simulation arithmetic uses standard-library Decimal. No broker clients are introduced.
 
-## Technology candidates
-Python 3.12+, pandas, NumPy, CCXT, yfinance, Parquet/pyarrow, pytest, Ruff, and Backtesting.py (or a custom deterministic simulator if fill semantics cannot meet requirements). IBKR/ib_async and Kraken trading clients are **deferred** integrations, not MVP dependencies. SQLite may store structured trade events; Streamlit is optional, not required.
+Live execution needs a separate explicit request, disabled-by-default opt-in, preflight checks, reconciliation, exposure caps, a kill switch, and no withdrawal permissions. Follow [agent rules](../AGENTS.md).
