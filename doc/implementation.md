@@ -1,6 +1,6 @@
 # Implementation
 
-Status: phases 0–2 implemented; phase 3 supports the explicitly limited simulation workflow below. Complete phases in order through linked issues and PRs. AI agents must never merge.
+Status: phases 0–2 and the pre-paper scanner milestone are implemented; phase 3 supports the limited simulation workflow below. Complete phases in order through linked issues and PRs. AI agents must never merge.
 
 ## 0. Foundation
 - [x] Add `pyproject.toml`, Python version policy, dependency locking, `.gitignore`, and README commands.
@@ -30,6 +30,14 @@ Status: phases 0–2 implemented; phase 3 supports the explicitly limited simula
 - [ ] Implement and validate split/dividend accounting before accepting windows containing corporate actions; current runs reject them.
 - [ ] Add partial fills, liquidity/volume constraints, corporate-action cash timing, and more detailed FX execution costs if required by later research.
 - [ ] Multi-asset/shared portfolio simulation is not implemented; current comparisons use independent single-symbol accounts.
+
+## 3.5. Daily watchlist scanner (issue #9)
+- [x] Typed crypto/stock watchlists and versioned strategy configuration.
+- [x] UTC/session-aware due checks, publication delays, closed-bar warm-up, overlap updates, and traceable data revisions.
+- [x] SQLite locking, atomic progress/report commit, restart repair, and duplicate prevention.
+- [x] Separate fresh, catch-up, revision, and fixture results with local JSON/Markdown reports and partial-failure status.
+- [x] Single-run CLI, offline demo, provider smoke check, and scheduler-ready Windows/cron instructions.
+- Delivered: [scanner commands/contracts](scanner.md). No task is activated automatically. Windows Task Scheduler integration remains unverified on the Linux development host.
 
 ## 4. Paper trading
 - [ ] Reuse strategy/risk/ledger contracts with simulated fills only.

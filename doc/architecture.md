@@ -8,6 +8,7 @@ Flow: sources → normalized/validated UTC OHLCV → cache → strategy signals 
 Implemented modules under `src/crow_trading/`:
 - `data/`: typed candles/metadata, CCXT/yfinance adapters, calendar-aware validation, archive import, immutable Parquet storage.
 - `strategies/`: typed signal/protocol, pure momentum and mean reversion, causal replay/latest runner, offline JSON CLI.
+- `scanner/`: typed watchlists, calendar due checks, provider I/O/retries, overlap snapshot merges, transactional SQLite progress/report payloads, expiry-aware JSON/Markdown reports, and a single-run CLI.
 - `backtesting/models.py`: Decimal settings, costs, and chronological windows.
 - `backtesting/market.py`: as-of EUR-triangulated FX and corporate-action support checks.
 - `backtesting/ledger.py`, `risk.py`, `engine.py`: cash/cost basis, entry limits, close-observed risk stops, next-open simulation.
@@ -33,6 +34,11 @@ Implemented modules under `src/crow_trading/`:
 - Stocks: model sessions/holidays, splits, dividends, delistings, share precision, minimum commissions, adjusted prices, and USD/EUR/DKK FX. yfinance intraday history is limited.
 - Compare markets over explicit, comparable horizons. Freeze experiment parameters before untouched-test evaluation.
 - Keep tax scenarios separate; do not apply a flat tax deduction to every candle.
+
+## Scanner contracts
+An external scheduler starts the single-run CLI; no scheduler or portfolio logic lives in strategies. SQLite commits progress, signal identities, and report content together under an exclusive write transaction. Missing report projections are repaired; conflicting user edits are preserved. Instrument savepoints isolate provider failures. Immutable source/merged snapshots retain lineage; updates detect revisions only in their fetched overlap.
+
+Fresh candidate summaries exclude historical catch-up, revisions, expired records, and offline fixtures. Full snapshot fingerprints preserve provenance while trailing-content hashes prevent duplicates when unrelated history grows. Market calendars and UTC deadlines drive scheduling regardless of the host timezone. See [scanner](scanner.md) for exact state, timing, retry, and recovery contracts. Windows integration is documented, not executed on this Linux host.
 
 ## Simulation limits
 Each dataset, evaluation window, and benchmark has an independent one-symbol account. No multi-asset portfolio or shared exposure accounting is implied. Indicators may warm from earlier bars, but cash and holdings reset per window. Full fills occur at eligible bar opens; no intrabar execution or guaranteed stop prices.
