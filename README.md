@@ -1,11 +1,11 @@
 # Crow Trading
 
 Local Python research and paper trading for crypto and stock strategies. The
-current implementation caches daily historical data and evaluates momentum
-and mean-reversion signals, and simulates historical single-asset trades offline.
-See [data commands](doc/data.md), [strategy rules](doc/strategies.md), and
-[backtesting commands and limitations](doc/backtesting.md). Paper/live execution
-is not implemented.
+current implementation caches daily historical data, scans watchlists for daily
+strategy signals, and simulates historical single-asset trades offline.
+See [data commands](doc/data.md), [strategy rules](doc/strategies.md),
+[backtesting](doc/backtesting.md), and [daily scanning/scheduling](doc/scanner.md).
+Paper/live execution is not implemented.
 Read [AGENTS.md](AGENTS.md) and the [implementation plan](doc/implementation.md)
 before making changes. Work through issues and PRs; only the human user merges.
 
@@ -55,3 +55,17 @@ Open `data/backtest-demo/crypto-run/report.json` and the three
 `stock-run` for the FX/stock-session example. All output paths must be new.
 These fixtures are synthetic functional examples, not market-performance results.
 Use documented verified inputs and market assumptions for actual research.
+
+## Scan a daily watchlist
+
+Review the example, then run one public-provider scan:
+
+```sh
+uv run --locked python -m crow_trading.scanner examples/scanner/watchlist.json
+```
+
+Reports are saved under `data/scanner/reports/` as JSON and Markdown. The scanner
+can be invoked every 15 minutes and skips unchanged candles without downloading
+or reporting them again. Read [scanner setup](doc/scanner.md) for the offline
+demo, watchlist fields, expiry/revision rules, recovery, and Windows Task Scheduler
+instructions. No schedule is installed automatically and no orders are placed.

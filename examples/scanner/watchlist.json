@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "state_dir": "../../data/scanner",
+  "attempts": 3,
+  "provider_interval_seconds": 1,
+  "instruments": [
+    {
+      "name": "btc-eur",
+      "kind": "crypto",
+      "provider": "ccxt",
+      "venue": "kraken",
+      "symbol": "BTC/EUR",
+      "currency": "EUR",
+      "calendar": "24/7",
+      "adjusted": false,
+      "history_bars": 60,
+      "overlap_bars": 5,
+      "max_catchup_bars": 90,
+      "finalization_delay_seconds": 900,
+      "max_signal_age_seconds": 64800,
+      "strategies": [
+        {"id": "momentum", "version": "1", "parameters": {"entry_lookback": 20, "exit_lookback": 10}},
+        {"id": "mean-reversion", "version": "1", "parameters": {"lookback": 20, "entry_deviation": 0.05}}
+      ]
+    },
+    {
+      "name": "aapl",
+      "kind": "stock",
+      "provider": "yfinance",
+      "venue": "yahoo",
+      "symbol": "AAPL",
+      "currency": "USD",
+      "calendar": "XNYS",
+      "adjusted": false,
+      "history_bars": 60,
+      "overlap_bars": 5,
+      "max_catchup_bars": 90,
+      "finalization_delay_seconds": 1800,
+      "max_signal_age_seconds": 64800,
+      "strategies": [
+        {"id": "momentum", "version": "1", "parameters": {"entry_lookback": 20, "exit_lookback": 10}},
+        {"id": "mean-reversion", "version": "1", "parameters": {"lookback": 20, "entry_deviation": 0.05}}
+      ]
+    }
+  ]
+}

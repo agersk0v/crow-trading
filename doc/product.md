@@ -9,9 +9,10 @@ Compare crypto and stock swing strategies after realistic costs. Support local r
 - Offline single-asset backtests with costs, FX, risk checks, isolated evaluation windows, ledger, benchmarks, and charts.
 - Stock simulation supports unadjusted prices only and requires a complete no-corporate-action coverage snapshot. Splits/dividends and adjusted-price fills are rejected, not ignored.
 - FX uses explicit timestamped snapshots; no rates or corporate-action facts are invented. Demo datasets/rates are synthetic and do not measure investment performance.
-- No watchlist scanning, scheduling, notifications, paper execution, or live trading yet.
+- Daily watchlist scans with calendar/publication delays, immutable overlap updates, recoverable deduplication, and local signal reports. Scheduler-ready CLI and Windows/cron guides; no active schedule is installed automatically.
+- No external notifications, paper execution, or live trading yet.
 
-See [data](data.md), [strategies](strategies.md), and [backtesting](backtesting.md) for commands and precise limitations.
+See [data](data.md), [strategies](strategies.md), [backtesting](backtesting.md), and [scanner](scanner.md) for commands and precise limitations.
 
 ## MVP requirements
 - Assets: BTC/EUR, ETH/EUR, and a small liquid stock sample.
