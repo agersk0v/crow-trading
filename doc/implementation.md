@@ -1,68 +1,43 @@
-# Crow Trading: Implementation Plan
+# Implementation
 
-**Status:** planning. The initial repository contains documentation; application implementation is not yet started.
+Status: phases 0–2 implemented; phase 3 supports the explicitly limited simulation workflow below. Complete phases in order through linked issues and PRs. AI agents must never merge.
 
-## Phase 0: Repository foundation
-- [ ] Add `pyproject.toml`, Python version policy, `.gitignore`, README, and dependency lock strategy.
-- [ ] Set up `src/crow_trading/` and `tests/`.
-- [ ] Configure Ruff, pytest, typing checks, and GitHub Actions CI. No secrets or broker credentials in CI.
-- [ ] Document local environment and reproducible commands.
+## 0. Foundation
+- [x] Add `pyproject.toml`, Python version policy, dependency locking, `.gitignore`, and README commands.
+- [x] Create `src/crow_trading/` and `tests/`.
+- [x] Configure Ruff, typing, pytest, and GitHub Actions without secrets.
+- Done when: install, lint, type checks, and tests pass locally and in CI.
 
-**Done when:** the skeleton installs locally, lint and tests run cleanly, and CI enforces them.
+## 1. Historical data
+- [x] Add CCXT ingestion with pagination/rate limits and an archive option; add yfinance daily research data.
+- [x] Normalize UTC OHLCV; check closed candles, duplicates, gaps, calendars, unsupported timeframes, and source limitations.
+- [x] Cache Parquet with provenance and reproducible retrieval.
+- Done when: BTC/EUR, ETH/EUR, and one stock can be fetched, validated, cached, and reloaded with tests.
 
-## Phase 1: Historical data
-- [ ] Implement crypto OHLCV ingestion using CCXT with rate limits, pagination where supported, and an archive path for older data.
-- [ ] Implement stock historical daily OHLCV ingestion using yfinance for research; document intraday limits and adjusted-price behavior.
-- [ ] Normalize UTC timestamps, OHLCV schema, symbol/venue metadata, candle completeness, and duplicate/missing-bar checks.
-- [ ] Cache datasets in Parquet and make retrieval reproducible.
-- [ ] Test closed-candle handling, unsupported timeframes, incomplete histories, and exchange-calendar differences.
+## 2. Strategies
+- [x] Define a pure strategy protocol and fixed-parameter momentum-breakout and mean-reversion strategies.
+- [x] Start with daily closed bars; test synthetic series, boundaries, and look-ahead prevention.
+- Done when: identical strategy code produces repeatable signals for both markets without broker calls.
 
-**Done when:** BTC/EUR, ETH/EUR, and at least one stock can be fetched, validated, cached, and reloaded with provenance metadata.
+## 3. Backtesting
+- [x] Implement long-only cash/positions, next-bar fills, €50 position targets, and risk limits.
+- [x] Model calendars, fees, spread, slippage, quantity constraints, and timestamped FX. Require stock action coverage; reject unsupported splits/dividends and adjusted-price fills.
+- [x] Add ledger, metrics, buy-and-hold/cash benchmarks, and train/validation/untouched-test splits.
+- [x] Test fills, costs, insufficient cash, rejections, missing data, and independent portfolios.
+- Delivered: offline crypto/stock synthetic examples produce ledger/trades CSV, frozen configuration/input hashes, metrics, benchmark comparisons, equity/drawdown SVG, explicit windows/costs/protocol. See [backtesting](backtesting.md). Synthetic results are functional evidence only.
 
-## Phase 2: Baseline strategies
-- [ ] Define a pure `Strategy` protocol returning signal intents from validated candles.
-- [ ] Implement fixed-parameter momentum breakout and mean-reversion variants.
-- [ ] Make the evaluation schedule explicit (initially daily bars; later 4-hour crypto and eligible stock intraday sources).
-- [ ] Unit-test signals on synthetic series, including boundary and look-ahead cases.
+### Remaining simulation limitations
+- [ ] Implement and validate split/dividend accounting before accepting windows containing corporate actions; current runs reject them.
+- [ ] Add partial fills, liquidity/volume constraints, corporate-action cash timing, and more detailed FX execution costs if required by later research.
+- [ ] Multi-asset/shared portfolio simulation is not implemented; current comparisons use independent single-symbol accounts.
 
-**Done when:** identical strategy code processes both market types and generates repeatable signals without broker calls.
+## 4. Paper trading
+- [ ] Reuse strategy/risk/ledger contracts with simulated fills only.
+- [ ] Persist state, process closed candles, prevent duplicate orders, enforce caps, and support manual stop.
+- [ ] Log stale/missing data and compare paper fills with modeled assumptions.
+- Done when: end-to-end execution survives restarts, reconstructs every trade, and places zero real orders.
 
-## Phase 3: Backtest and evaluation
-- [ ] Add cash/positions, long-only simulated fills, next-bar execution, market-specific calendars, €50 position target, and risk limits.
-- [ ] Model fixed/percentage commissions, spread, slippage, lot/fractional-share constraints, and currency conversion.
-- [ ] Record an auditable trade ledger and calculate gross/net P&L, drawdown, benchmark performance, turnover, trade count, and win/loss characteristics.
-- [ ] Establish training/validation/untouched-test splits and prohibit in-sample-only profitability claims.
-- [ ] Add tests for fills, insufficient cash, costs, rejected orders, missing data, and independent portfolio comparisons.
+## Deferred: live trading
+Do not implement or activate live trading during MVP work. A separate explicit request must resolve Danish broker eligibility, API terms, fees, precision, tax reporting, credentials, reconciliation, and kill-switch requirements.
 
-**Done when:** both markets can be compared using the same strategy with explicit assumptions and reproducible, benchmarked reports.
-
-## Phase 4: Paper trading
-- [ ] Build a paper execution adapter with the same intents/ledger as the backtester.
-- [ ] Poll only completed candles; persist state and enforce risk/exposure/order limits.
-- [ ] Add logs, duplicate-order protection, alerts for missing/stale data, and manual stop.
-- [ ] Compare paper fills and operational behavior against modeled backtest assumptions.
-
-**Done when:** the system can run end-to-end with **zero real-money orders**, handle restarts safely, and reconstruct every paper trade.
-
-## Phase 5: Optional live broker integrations (future approval required)
-- [ ] Re-evaluate the venue and account eligibility for a Danish user.
-- [ ] Review exact API terms, fee schedules, minimum trade sizes, tax treatment and reporting.
-- [ ] Design live Kraken spot and IBKR stock adapters with explicit permissions.
-- [ ] Require user approval for enabling real trades, no withdrawal scope, explicit environment separation, kill switch, exposure caps, error handling and order reconciliation.
-- [ ] Perform small-scale controlled validation only after paper-trading evidence.
-
-**Do not implement or activate phase 5 as part of the initial setup.**
-
-## Initial measurable research experiment
-- Capital: **€50 notional per position**; total account size and loss budget to be chosen later.
-- Assets: BTC/EUR, ETH/EUR, and a small liquid stock sample.
-- Timeframe: daily bars first; expand to intraday only with adequate historical depth and quality.
-- Hypotheses: momentum breakout vs. mean reversion; predeclare parameters.
-- Baselines: per-asset buy-and-hold plus cash, with comparable funding and costs.
-- Outputs: trades CSV, run configuration and dataset fingerprints, performance table, and drawdown chart.
-- Decision rule: do not proceed to live execution without robust out-of-sample results after realistic costs; finding no edge is acceptable.
-
-## Open decisions
-Stock universe and exchanges; stock data licensing; exact starting capital and maximum loss; crypto execution venue; allowed holding time and signals; broker availability and permissions; tax/export requirements.
-
-See [product.md](product.md), [architecture.md](architecture.md), and [../AGENTS.md](../AGENTS.md).
+See [product requirements](product.md), [architecture](architecture.md), and [agent rules](../AGENTS.md).
