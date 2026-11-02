@@ -15,7 +15,8 @@ Implemented modules under `src/crow_trading/`:
 - `backtesting/experiment.py`: frozen configuration/input hashes and protocol versions.
 - `backtesting/metrics.py`, `reports.py`: ledger/equity CSV, metrics/benchmarks JSON, and standalone SVG charts.
 - Deterministic tests in `tests/`; synthetic examples in `examples/backtesting/`.
-- `paper/engine.py`: initialization and step transaction boundaries.
+- `paper/engine.py`: initialization and policy dispatch; daily step transaction boundaries.
+- `paper/quotes.py`, `quote_source.py`, `quote_engine.py`: typed public quotes, bid/ask valuation/evidence, and reserve → observe → revalidate/fill transactions. HTTP runs outside financial write locks.
 - `paper/portfolio.py`: portfolio queries, price/quantity arithmetic, marks, and valuation records.
 - `paper/orders.py`: order creation, full fills, and pending-order reconciliation.
 - `paper/risk.py`, `signals.py`: shared entry/risk checks and scanner-signal validation/decisions.
@@ -35,7 +36,7 @@ Implemented modules under `src/crow_trading/`:
 
 ## Invariants
 - Strategies consume validated data and return signals; never call brokers.
-- Evaluate closed candles only. Default to next-bar execution after a signal exists.
+- Strategies evaluate closed candles only. Execution uses the account's immutable daily-bar or quote policy; quote observations must follow order creation/delay.
 - Never fabricate tradable candles by forward-filling missing data.
 - Handle empty data, insufficient history/cash, stale prices, wide spreads, and rejected orders. Partial fills are unsupported.
 - Crypto: model 24/7 trading, venue fees, minimum sizes, and quantity steps. Kraken OHLC history is limited; use archives for longer studies and cross-check venue prices.
@@ -50,9 +51,9 @@ invokes scanner and paper sequentially; no scheduler or portfolio logic lives in
 Fresh candidate summaries exclude historical catch-up, revisions, expired records, and offline fixtures. Full snapshot fingerprints preserve provenance while trailing-content hashes prevent duplicates when unrelated history grows. Market calendars and UTC deadlines drive scheduling regardless of the host timezone. See [scanner](scanner.md) for exact state, timing, retry, and recovery contracts. Windows integration is documented, not executed on this Linux host.
 
 ## Paper contracts
-Each paper account selects exactly one strategy and shares cash/risk across its allowed assets. Different strategy accounts have separate virtual funding. Scanner records are read in a committed snapshot; paper decisions acknowledge them atomically with orders and reservations in a separate SQLite database. No source progress/report data is changed.
+Each paper account selects exactly one strategy and shares cash/risk across its allowed assets. The optional version-2 quote policy supports Kraken BTC/EUR only and requires new IDs; original daily-bar policy hashes remain unchanged. Different strategy accounts have separate virtual funding. Scanner records are read in a committed snapshot; paper decisions acknowledge them atomically with orders and reservations in a separate SQLite database. No source progress/report data is changed.
 
-The version-1 adapter simulates full fills at the first scheduled open after actual order creation, confirming only after that daily bar is published. It never uses an earlier open. Inputs, effective/recorded fill times, fees, FX, balances, cost basis, and decisions remain auditable. Unknown states fail reconciliation before more orders are processed. Manual stop cancels entries but leaves exits/reconciliation active. See [paper contracts](paper.md) for timing approximations, supported states, migrations, controls, and limitations.
+The version-1 adapter simulates full fills at the first scheduled open after actual order creation, confirming only after that daily bar is published. It never uses an earlier open. Inputs, effective/recorded fill times, fees, FX, balances, cost basis, and decisions remain auditable. Unknown states fail reconciliation before more orders are processed. Manual stop cancels entries but leaves exits/reconciliation active. See [paper contracts](paper.md) for daily policy and controls, and [quote execution](quotes.md) for public timestamp limitations, evidence, and two-stage processing.
 
 ## Backtesting simulation limits
 Each backtest dataset, evaluation window, and benchmark has an independent one-symbol account. No multi-asset portfolio or shared exposure accounting is implied. Indicators may warm from earlier bars, but cash and holdings reset per window. Full fills occur at eligible bar opens; no intrabar execution or guaranteed stop prices.

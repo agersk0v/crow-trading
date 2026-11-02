@@ -27,6 +27,18 @@ before using this workflow. No tasks are changed automatically.
 Daily-bar fills remain delayed: checking every five minutes does not fill orders
 at live prices. Read [runner commands](doc/runner.md) and [paper contracts](doc/paper.md).
 
+## Use current quotes for BTC/EUR paper trades
+
+```sh
+uv run --locked python -m crow_trading.runner examples/paper/quotes.json
+```
+
+This selects a new policy and separate virtual accounts under `data/paper-quotes/`.
+Daily strategies produce signals; eligible orders can fill from a fresh later
+bid/ask quote in the same cycle. Existing daily-bar accounts are unchanged. Read
+[quote execution, fees, timestamp limitations, and testing](doc/quotes.md) first.
+No real orders are sent.
+
 ## Offline check
 
 ```sh
@@ -55,7 +67,7 @@ Never edit database rows or referenced market-data files.
 - [Backtesting](doc/backtesting.md): frozen experiments, costs, benchmarks, and charts.
 - [Standalone scanner](doc/scanner.md): one-shot scans, optional reports, alternate scheduling.
 - [Architecture](doc/architecture.md): module boundaries and supported behavior.
-- [Implementation plan](doc/implementation.md): next is quote-based BTC/EUR paper execution, followed by validation, stocks, and storage scaling.
+- [Implementation plan](doc/implementation.md): next is paper-workflow validation/results, followed by stocks and storage scaling.
 
 ## Development
 

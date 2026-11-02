@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from crow_trading.backtesting.models import Costs, Settings, number, parse_settings
 from crow_trading.data.models import DataError
+from crow_trading.paper.quotes import QUOTE_FILL_POLICY, QUOTE_VERSION, QuotePolicy
 from crow_trading.scanner.config import (
     Instrument,
     Watchlist,
@@ -37,10 +38,15 @@ class Account:
     mark_max_age_seconds: int
     signal_max_age_seconds: int
     assets: tuple[Asset, ...]
+    quote_policy: QuotePolicy | None = None
+
+    @property
+    def fill_policy(self) -> str:
+        return QUOTE_FILL_POLICY if self.quote_policy else "next_closed_daily_open"
 
     def policy(self, mode: str) -> dict[str, Any]:
         # Input file locations may move/update; actual bytes are archived per use.
-        return {
+        policy = {
             "paper_version": PAPER_VERSION,
             "mode": mode,
             "name": self.name,
@@ -57,6 +63,13 @@ class Account:
                 for a in self.assets
             ],
         }
+        if self.quote_policy is not None:
+            policy.update(
+                paper_version=QUOTE_VERSION,
+                fill_policy=self.fill_policy,
+                quote_policy=asdict(self.quote_policy),
+            )
+        return policy
 
 
 @dataclass(frozen=True)
@@ -66,16 +79,25 @@ class Config:
     mode: Literal["paper", "fixture"]
     fx_snapshot: Path
     accounts: tuple[Account, ...]
+    quote_policy: QuotePolicy | None = None
 
 
 def read_config(path: Path) -> Config:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    if raw["schema_version"] != 1 or raw["fill_policy"] != "next_closed_daily_open":
-        raise DataError(
-            "only schema 1 and next_closed_daily_open full fills are supported"
-        )
+    if raw["schema_version"] != 1 or raw["fill_policy"] not in (
+        "next_closed_daily_open",
+        QUOTE_FILL_POLICY,
+    ):
+        raise DataError("unsupported schema or paper fill policy; full fills only")
     if raw["mode"] not in ("paper", "fixture"):
         raise DataError("mode must be paper or fixture")
+    quote_policy = (
+        QuotePolicy(**raw["quote_policy"])
+        if raw["fill_policy"] == QUOTE_FILL_POLICY
+        else None
+    )
+    if quote_policy is None and "quote_policy" in raw:
+        raise DataError("quote_policy applies only to quote-based execution")
     watchlist = read_watchlist(path.parent / raw["watchlist"])
     instruments = {item.name: item for item in watchlist.instruments}
     accounts: list[Account] = []
@@ -98,6 +120,17 @@ def read_config(path: Path) -> Config:
             if instrument.adjusted:
                 raise DataError("paper fills require unadjusted price inputs")
             costs = Costs(**{key: number(val) for key, val in value["costs"].items()})
+            if quote_policy is not None and (
+                instrument.symbol != "BTC/EUR"
+                or instrument.venue != "kraken"
+                or instrument.currency != "EUR"
+                or instrument.kind != "crypto"
+                or costs.spread_bps != 0
+                or settings.costs.spread_bps != 0
+            ):
+                raise DataError(
+                    "quote policy requires Kraken BTC/EUR and zero synthetic spread"
+                )
             actions = value.get("corporate_actions")
             assets.append(
                 Asset(
@@ -117,6 +150,7 @@ def read_config(path: Path) -> Config:
                 integer(item["mark_max_age_seconds"], "mark age", 1, 604800),
                 integer(item["signal_max_age_seconds"], "signal age", 1, 604800),
                 tuple(assets),
+                quote_policy,
             )
         )
     if not accounts or len({a.name for a in accounts}) != len(accounts):
@@ -127,4 +161,5 @@ def read_config(path: Path) -> Config:
         raw["mode"],
         (path.parent / raw["fx_snapshot"]).resolve(),
         tuple(accounts),
+        quote_policy,
     )

@@ -121,6 +121,7 @@ class Harness:
             "positions",
             "decisions",
             "events",
+            "valuations",
         )
         with State(self.config.state_dir) as state:
             return state.rows(f"SELECT * FROM {table} ORDER BY rowid")

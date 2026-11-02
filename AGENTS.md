@@ -4,7 +4,7 @@
 - [Product](doc/product.md): scope and acceptance criteria.
 - [Architecture](doc/architecture.md): boundaries and data rules.
 - [Implementation](doc/implementation.md): ordered tasks.
-- Current state: historical data, pure strategies, daily watchlist scanning, and offline single-asset backtesting. See [scanner contracts](doc/scanner.md). Local paper trading is implemented with simulated accounts/orders only; see [paper contracts](doc/paper.md). See [backtesting limits](doc/backtesting.md). The foreground [main runner](doc/runner.md) combines scanner/paper cycles with persistent-account resume and console summaries; it does not change fill timing or install schedules.
+- Current state: historical data, pure strategies, daily watchlist scanning, and offline single-asset backtesting. See [scanner contracts](doc/scanner.md). Local paper trading is implemented with simulated accounts/orders only; see [paper contracts](doc/paper.md). See [backtesting limits](doc/backtesting.md). The foreground [main runner](doc/runner.md) combines scanner/paper cycles with persistent-account resume and console summaries; it supports the selected immutable fill policy and installs no schedules. The optional [quote policy](doc/quotes.md) supports public Kraken BTC/EUR; daily accounts remain compatible.
 
 ## GitHub rules
 - Use GitHub issues and pull requests for all changes.
@@ -18,13 +18,18 @@
 - Scanner schema 2 retains legacy reports and aggregates identical failure-only scans. Default file exports are off; preserve the opt-in repair/conflict behavior.
 - Never prune financial records or referenced snapshots as incidental cleanup. Immutable paper price archives may share hard-linked file data; never edit either path in place.
 
+## Quote execution
+- Read [quote contracts](doc/quotes.md). Only public Kraken BTC/EUR is supported; no order API or trading credentials.
+- Keep quote HTTP outside financial write transactions. Re-check stopped/cancelled/revised orders and timing/risk after observations; never use pre-order quotes for fills.
+- Preserve explicit timestamp provenance, zero synthetic spread, quote evidence, and legacy daily account compatibility.
+
 ## Paper/runner maintenance
 - Preserve `paper.engine.initialize` and `step` as transaction entry points. Portfolio, orders, risk, and signal decisions live in focused modules.
 - Runner summaries use incremental activity reads; never weaken ledger reconciliation or treat console cursors as financial acknowledgements.
 - Share synthetic market fixtures via `tests/helpers/paper.py`, not imports between test modules.
 
 ## Next milestone
-- Follow the ordered [next steps](doc/implementation.md#next-steps). Quote-based BTC/EUR paper execution is planned first; the current fill policy remains daily-bar based until separately implemented.
+- Follow the ordered [next steps](doc/implementation.md#next-steps). Phase 6 (workflow validation/results) is next. Quote execution is opt-in via new account IDs; preserve legacy daily policy hashes.
 
 ## Work rules
 - Inspect relevant files and existing tests before editing.

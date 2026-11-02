@@ -109,12 +109,19 @@ def activity(
             "(simulated order, not a fill)"
         )
     for fill in new_fills:
+        quote_detail = (
+            f" quote_at={fill['quote_observed_at']} "
+            f"basis={fill['quote_timestamp_basis']}"
+            if "quote_fingerprint" in fill
+            else ""
+        )
         emit(
             f"{prefix} FILL {fill['account_id']} {fill['side'].upper()} "
             f"{fill['quantity']} {fill['symbol']} at {fill['fill_price_quote']} "
             f"{fill['quote_currency']} fee={fill['fee_account']} "
             f"{fill['account_currency']} "
-            f"effective_at={fill['effective_at']} recorded_at={fill['recorded_at']}"
+            f"effective_at={fill['effective_at']} "
+            f"recorded_at={fill['recorded_at']}{quote_detail}"
         )
     emit(f"{prefix} Trades: {len(new_fills)} new simulated fills.")
     valuations = {
@@ -125,7 +132,11 @@ def activity(
         name = account["id"]
         valuation = valuations.get(name)
         current = bool(
-            valuation and valuation["as_of"] == (paper_result or {}).get("as_of")
+            valuation
+            and valuation["as_of"]
+            == results.get(name, {}).get(
+                "valuation_as_of", (paper_result or {}).get("as_of")
+            )
         )
         value = (
             f"holdings={valuation['holdings']} total={valuation['equity']} "
@@ -133,6 +144,19 @@ def activity(
             if valuation
             else "holdings=unavailable total=unavailable valuation=unavailable"
         )
+        if valuation:
+            quote_marks = [
+                m for m in valuation["marks"].values() if "quote_fingerprint" in m
+            ]
+            if quote_marks:
+                bases = ",".join(
+                    sorted({m["quote_timestamp_basis"] for m in quote_marks})
+                )
+                value += (
+                    f" quote_at={min(m['price_time'] for m in quote_marks)}"
+                    f" basis={bases}"
+                    " mark_side=bid"
+                )
         currency = next(
             a.settings.account_currency for a in config.accounts if a.name == name
         )

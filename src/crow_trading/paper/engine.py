@@ -1,5 +1,6 @@
 """Transaction boundaries for initialization and one paper-processing step."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -7,6 +8,8 @@ from crow_trading.data.models import DataError, utc
 from crow_trading.paper.config import Config
 from crow_trading.paper.orders import defer, reconcile_orders
 from crow_trading.paper.portfolio import Valuation, pending, record_valuation, value
+from crow_trading.paper.quotes import QuoteFetcher
+from crow_trading.paper.quotes import clock as quote_clock
 from crow_trading.paper.risk import risk
 from crow_trading.paper.signals import process_signals
 from crow_trading.paper.source import Source
@@ -26,7 +29,21 @@ def initialize(config: Config, now: datetime) -> dict[str, Any]:
     }
 
 
-def step(config: Config, now: datetime | None = None) -> dict[str, Any]:
+def step(
+    config: Config,
+    now: datetime | None = None,
+    *,
+    clock: Callable[[], datetime] = quote_clock,
+    quote_fetcher: QuoteFetcher | None = None,
+) -> dict[str, Any]:
+    if config.quote_policy is not None:
+        from crow_trading.paper.quote_engine import quote_step
+
+        if now is not None:
+            raise DataError(
+                "quote execution requires an advancing clock; --as-of is not supported"
+            )
+        return quote_step(config, clock, quote_fetcher)
     now = utc(now or datetime.now(UTC))
     result: list[dict[str, Any]] = []
     with State(config.state_dir) as state:

@@ -1,7 +1,10 @@
-# Local paper trading (version 1)
+# Local paper trading
 
 This module consumes scanner signals into persistent **simulated** accounts.
-There are no broker adapters, production credentials, real orders, APIs, database
+This page describes the original daily-bar policy (version 1). The optional
+[quote policy](quotes.md) (version 2) uses public Kraken BTC/EUR bid/ask observations
+and requires new account IDs. Existing daily-bar policies remain unchanged.
+There are no broker adapters, production credentials, real orders, hosted API endpoints, database
 servers, containers, or deployments. All state lives in local SQLite and immutable
 input files. Existing scanner jobs do not automatically start paper processing.
 The [main runner](runner.md) initializes/resumes accounts and repeats scanner →
@@ -100,10 +103,14 @@ Exit codes: `0` success, `1` invalid configuration/degraded data/reconciliation
 failure, `3` another worker owns the SQLite write lock. Operational results/errors
 are JSON on stdout/stderr. There are no external notifications.
 
-## Configuration and account rules
+## Daily configuration and account rules
 `examples/paper/paper.json` is complete. Required top-level fields:
 `schema_version: 1`, `mode` (`paper` or `fixture`), `fill_policy:
 next_closed_daily_open`, `state_dir`, `watchlist`, `fx_snapshot`, and `accounts`.
+
+For the quote policy use `examples/paper/quotes.json`; its explicit `quote_policy`
+settings replace daily-price execution assumptions. Other commands and controls
+are shared.
 
 Each account supplies a unique name, one versioned strategy definition, explicit
 [backtest settings](backtesting.md#configuration), `max_positions`,

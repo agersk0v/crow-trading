@@ -66,19 +66,13 @@ def value(
         if not quantity:
             continue
         asset = configured[row["instrument_key"]]
-        quote = source.mark(
+        mark = source.valuation_mark(
             asset, when, current=current, max_age=account.mark_max_age_seconds
         )
         rate = book.rate(
             asset.instrument.currency, account.settings.account_currency, when
         )
-        amount = (
-            quantity
-            * number(
-                quote.mark_price if quote.mark_price is not None else quote.candle.close
-            )
-            * rate
-        )
+        amount = quantity * mark.price * rate
         holdings += amount
         basis += number(row["basis"])
         marks[asset.instrument.key] = {
@@ -87,11 +81,7 @@ def value(
             "value": str(amount),
             "basis": row["basis"],
             "quote_to_account_fx": str(rate),
-            "candle_timestamp": quote.candle.timestamp.isoformat(),
-            "price_time": quote.mark_time.isoformat()
-            if quote.mark_time
-            else quote.candle.closed_at.isoformat(),
-            "dataset_fingerprint": quote.dataset_fingerprint,
+            **mark.evidence,
         }
     cash = state.balance(account.name).cash
     return Valuation(cash + holdings, holdings, holdings - basis, marks)
