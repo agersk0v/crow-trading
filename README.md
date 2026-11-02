@@ -55,7 +55,7 @@ Never edit database rows or referenced market-data files.
 - [Backtesting](doc/backtesting.md): frozen experiments, costs, benchmarks, and charts.
 - [Standalone scanner](doc/scanner.md): one-shot scans, optional reports, alternate scheduling.
 - [Architecture](doc/architecture.md): module boundaries and supported behavior.
-- [Implementation status](doc/implementation.md): completed milestones and remaining work.
+- [Implementation plan](doc/implementation.md): next is quote-based BTC/EUR paper execution, followed by validation, stocks, and storage scaling.
 
 ## Development
 

@@ -55,19 +55,40 @@ Status: phases 0–4, the scanner milestone, and the main runner are implemented
 - [x] Test offline buy/sell/restart, failures, concurrency, process-death lock release, and interrupt rollback.
 - Delivered: [runner commands/contracts](runner.md). Daily strategies and fill semantics unchanged; no active tasks or services installed.
 
-## Maintenance: paper/runner cleanup (issue #15)
-- [x] Extract portfolio, orders, risk, and signal decisions from paper transaction orchestration.
-- [x] Read focused runner summaries and incremental activity without copying full audit tables for reporting; retain full reconciliation.
-- [x] Decode valuation fills once per record and limit that query to the account.
-- [x] Share deterministic market fixtures in `tests/helpers/paper.py`; clarify backtesting-only limitations.
-- Existing commands, account policies, database schema, strategy/risk/fill semantics, and output remain unchanged.
+## Next steps
 
-## Maintenance: storage/reporting (issue #17)
-- [x] Default to SQLite-only reports; render Markdown on explicit/opt-in export and preserve legacy reports.
-- [x] Transactionally migrate scanner schema 1 → 2 and summarize identical consecutive failure-only scans.
-- [x] Share immutable price archive files with hard links where supported; retain verified-copy fallback and all referenced evidence.
-- [x] Make the runner the README entry point and document authoritative data, backups, and safe cleanup.
-- Remaining: cumulative history snapshots and full-history financial reconciliation still grow; partitioning and reference-aware pruning are not implemented. No historical records are automatically deleted.
+The milestones below are planned, not implemented. Start with phase 5; create a
+linked issue and PR for each bounded change. Do not change strategy parameters,
+reset existing accounts, or activate live trading as part of these milestones.
+
+### 5. Quote-based crypto paper execution — next
+- [ ] Keep strategy evaluation on completed daily candles; start with Kraken BTC/EUR only.
+- [ ] Fetch timestamped public bid/ask quotes separately from daily strategy data. Reject stale, invalid, or unavailable quotes; never use a quote observed before order creation for a new fill.
+- [ ] Add an explicit quote-based paper fill policy: buy at ask, sell at bid, apply configured fees/slippage and market quantity/minimum rules without double-counting spread. Full fills remain a documented approximation; no liquidity or partial-fill claim.
+- [ ] Use fresh quotes for paper holdings valuation and risk observation. Fetch network data outside financial write transactions; archive the evidence used for fills/marks.
+- [ ] Preserve the existing daily-bar policy for existing accounts. Version the new policy and require a new account ID rather than silently converting saved experiments.
+- [ ] Test timing, stale quotes, fees, reservations, risk limits, restart/deduplication, and provider outages with deterministic offline fixtures. Update commands and contracts.
+- Done when: a daily signal can create a simulated order and fill from a valid subsequent quote in the same runner cycle, without waiting for another daily candle to close or placing a real order.
+
+### 6. Validate the ongoing paper workflow and results
+- [ ] Add an offline end-to-end quote-policy demo covering entry, holding, exit, outages, and restart.
+- [ ] Provide a concise per-account results view: initial/current equity, realized/unrealized P&L, fees, drawdown, trade count, valuation freshness, and observation period. Reuse existing ledger/valuation data where sufficient; explicitly add any missing evidence.
+- [ ] Define a repeatable public-data observation procedure and manually verify the runner on the intended Windows machine. Keep scheduling opt-in.
+- [ ] Compare paper and backtest outcomes only where data, costs, timing, and portfolio assumptions align; explain differences rather than asserting equivalent fills or profitability.
+- Done when: the workflow survives interruption/outages without duplicate funding or trades, reconciles after restart, and explains each result from recorded inputs. A short run is functional validation, not proof of strategy quality.
+
+### 7. Extend realistic paper execution to stocks
+- [ ] Select a suitable stock quote source and verify its timestamps, delays, usage terms, sessions, and availability before integration; do not assume daily Yahoo research data is a live executable quote.
+- [ ] Supply timestamped FX and explicit venue costs/minimums. Continue rejecting adjusted-price fills and unsupported corporate-action windows.
+- [ ] Implement and test split/dividend position and cash accounting before supporting affected holdings; define how missing action coverage blocks execution.
+- [ ] Validate holidays, session boundaries, overnight gaps, stale quotes, FX conversion, and action handling with offline fixtures before adding a documented stock example.
+- Done when: a stock paper account can demonstrate a reconciled buy/hold/sell cycle with traceable quote/FX/action evidence and explicit remaining settlement/liquidity limitations.
+
+### 8. Measure and control storage growth
+- [ ] Measure snapshot size, signal/report history, and reconciliation time on representative watchlists before selecting a storage redesign. Investigate earlier if observed growth affects operation.
+- [ ] If needed, introduce versioned partitioned/shared history without changing old fingerprints or breaking frozen experiments and paper evidence; provide a tested migration path.
+- [ ] Add a reference-aware dry-run inventory before any pruning command. Preserve active state, pending-order inputs, lineage, financial records, and published experiment dependencies; make deletion an explicit user action.
+- Done when: measured growth has a documented budget and any migration/pruning tool proves that retained experiments and accounts still replay/reconcile. No financial records expire automatically.
 
 ## Deferred: live trading
 Do not implement or activate live trading during MVP work. A separate explicit request must resolve Danish broker eligibility, API terms, fees, precision, tax reporting, credentials, reconciliation, and kill-switch requirements.
