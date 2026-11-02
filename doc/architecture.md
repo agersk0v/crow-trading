@@ -15,7 +15,8 @@ Implemented modules under `src/crow_trading/`:
 - `backtesting/experiment.py`: frozen configuration/input hashes and protocol versions.
 - `backtesting/metrics.py`, `reports.py`: ledger/equity CSV, metrics/benchmarks JSON, and standalone SVG charts.
 - Deterministic tests in `tests/`; synthetic examples in `examples/backtesting/`.
-- Paper broker and accounting/tax integrations remain future work. No live adapters.
+- `paper/`: immutable account config, separate transactional SQLite accounting, read-only scanner handoff, archived inputs, daily-bar paper adapter, risk/reservations, reconciliation, and local inspect/control/export commands.
+- Real broker and accounting/tax integrations remain future work. No live adapters.
 
 ## Contracts
 - Candle: symbol, venue/source, UTC timestamp, timeframe, OHLCV, currency, adjustment flag, completeness.
@@ -39,6 +40,11 @@ Implemented modules under `src/crow_trading/`:
 An external scheduler starts the single-run CLI; no scheduler or portfolio logic lives in strategies. SQLite commits progress, signal identities, and report content together under an exclusive write transaction. Missing report projections are repaired; conflicting user edits are preserved. Instrument savepoints isolate provider failures. Immutable source/merged snapshots retain lineage; updates detect revisions only in their fetched overlap.
 
 Fresh candidate summaries exclude historical catch-up, revisions, expired records, and offline fixtures. Full snapshot fingerprints preserve provenance while trailing-content hashes prevent duplicates when unrelated history grows. Market calendars and UTC deadlines drive scheduling regardless of the host timezone. See [scanner](scanner.md) for exact state, timing, retry, and recovery contracts. Windows integration is documented, not executed on this Linux host.
+
+## Paper contracts
+Each paper account selects exactly one strategy and shares cash/risk across its allowed assets. Different strategy accounts have separate virtual funding. Scanner records are read in a committed snapshot; paper decisions acknowledge them atomically with orders and reservations in a separate SQLite database. No source progress/report data is changed.
+
+The version-1 adapter simulates full fills at the first scheduled open after actual order creation, confirming only after that daily bar is published. It never uses an earlier open. Inputs, effective/recorded fill times, fees, FX, balances, cost basis, and decisions remain auditable. Unknown states fail reconciliation before more orders are processed. Manual stop cancels entries but leaves exits/reconciliation active. See [paper contracts](paper.md) for timing approximations, supported states, migrations, controls, and limitations.
 
 ## Simulation limits
 Each dataset, evaluation window, and benchmark has an independent one-symbol account. No multi-asset portfolio or shared exposure accounting is implied. Indicators may warm from earlier bars, but cash and holdings reset per window. Full fills occur at eligible bar opens; no intrabar execution or guaranteed stop prices.

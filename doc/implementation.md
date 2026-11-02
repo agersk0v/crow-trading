@@ -1,6 +1,6 @@
 # Implementation
 
-Status: phases 0–2 and the pre-paper scanner milestone are implemented; phase 3 supports the limited simulation workflow below. Complete phases in order through linked issues and PRs. AI agents must never merge.
+Status: phases 0–2, the scanner milestone, and local paper trading are implemented; simulation limits remain explicit below. Complete phases in order through linked issues and PRs. AI agents must never merge.
 
 ## 0. Foundation
 - [x] Add `pyproject.toml`, Python version policy, dependency locking, `.gitignore`, and README commands.
@@ -39,11 +39,14 @@ Status: phases 0–2 and the pre-paper scanner milestone are implemented; phase 
 - [x] Single-run CLI, offline demo, provider smoke check, and scheduler-ready Windows/cron instructions.
 - Delivered: [scanner commands/contracts](scanner.md). No task is activated automatically. Windows Task Scheduler integration remains unverified on the Linux development host.
 
-## 4. Paper trading
-- [ ] Reuse strategy/risk/ledger contracts with simulated fills only.
-- [ ] Persist state, process closed candles, prevent duplicate orders, enforce caps, and support manual stop.
-- [ ] Log stale/missing data and compare paper fills with modeled assumptions.
-- Done when: end-to-end execution survives restarts, reconstructs every trade, and places zero real orders.
+## 4. Local paper trading (issue #11)
+- [x] Read scanner signals without modifying its state; preserve strategy/data identity and reject stale, revised, catch-up, or mode-mismatched records.
+- [x] Persist isolated strategy accounts with shared multi-asset cash/reservations/risk inside each account.
+- [x] Implement idempotent full simulated orders/fills, ledger, restart reconciliation, and manual stop/resume/cancel.
+- [x] Respect actual receipt time, later-session opens, public-data delays, market minimums, fees, FX, and no-action stock coverage.
+- [x] Provide one-shot worker, inspect/export/control CLI, immutable input archives, schema guards, and synthetic end-to-end tests.
+- Delivered: [local paper workflow](paper.md). No real orders, broker APIs, active schedules, remote APIs, or deployment infrastructure.
+- Remaining: real-time quote execution, partial fills/liquidity/settlement, and split/dividend accounting are unsupported. Daily-bar confirmations are approximations, not real broker fills.
 
 ## Deferred: live trading
 Do not implement or activate live trading during MVP work. A separate explicit request must resolve Danish broker eligibility, API terms, fees, precision, tax reporting, credentials, reconciliation, and kill-switch requirements.

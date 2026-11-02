@@ -1,0 +1,5 @@
+{
+  "base": "EUR",
+  "source": "EUR identity conversion only; no external exchange rates",
+  "rates": {}
+}

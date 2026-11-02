@@ -15,6 +15,7 @@ def entry_rejection(
     raw_quote: Decimal,
     position_cap: Decimal,
     settings: Settings,
+    equity_before: Decimal | None = None,
 ) -> str | None:
     costs = settings.costs
     if quantity <= 0 or quantity < costs.minimum_quantity:
@@ -27,7 +28,12 @@ def entry_rejection(
     if notional * rate + fee > cash:
         return "insufficient_cash"
     market_value = quantity * raw_quote * rate
-    equity_after = cash - notional * rate - fee + market_value
+    equity_after = (
+        (cash if equity_before is None else equity_before)
+        - notional * rate
+        - fee
+        + market_value
+    )
     if market_value > settings.max_exposure * equity_after:
         return "exposure_limit"
     return None
