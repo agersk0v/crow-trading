@@ -23,6 +23,9 @@
 - Runner summaries use incremental activity reads; never weaken ledger reconciliation or treat console cursors as financial acknowledgements.
 - Share synthetic market fixtures via `tests/helpers/paper.py`, not imports between test modules.
 
+## Next milestone
+- Follow the ordered [next steps](doc/implementation.md#next-steps). Quote-based BTC/EUR paper execution is planned first; the current fill policy remains daily-bar based until separately implemented.
+
 ## Work rules
 - Inspect relevant files and existing tests before editing.
 - Make the smallest change that satisfies the issue. Preserve unrelated user changes.
