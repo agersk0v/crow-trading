@@ -107,7 +107,9 @@ def export(root: Path, destination: Path) -> dict[str, Any]:
                 {"account_id": row["account_id"], **json.loads(row["payload"])}
                 for row in rows
             ]
-        fields = list(rows[0]) if rows else ["id"]
+        fields = (
+            list(dict.fromkeys(key for row in rows for key in row)) if rows else ["id"]
+        )
         # Values containing structured data are JSON strings inside CSV cells.
         with (destination / (table + ".csv")).open(
             "x", encoding="utf-8", newline=""

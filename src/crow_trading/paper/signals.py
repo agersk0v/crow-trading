@@ -184,6 +184,7 @@ def process_signals(
             "signal": record,
             "received_at": now.isoformat(),
             "order_id": order_id,
+            **source.decision_evidence(asset),
         }
         state.connection.execute(
             "INSERT OR REPLACE INTO decisions VALUES (?,?,?,?,?)",
@@ -210,6 +211,7 @@ def process_signals(
                 "signal_id": record["id"],
                 "reason": reason or "order_created",
                 "order_id": order_id,
+                **source.decision_evidence(asset),
             },
         )
     return errors

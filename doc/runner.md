@@ -8,7 +8,9 @@ orders are simulated. Rules are not generated or optimized automatically.
 
 From the repository root, install dependencies once with `uv sync --locked`.
 Review `examples/paper/paper.json`, its referenced watchlist, costs, and risk limits.
-The example funds two independent EUR 1,000 accounts and paper-trades BTC/EUR only.
+The daily-bar example funds two independent EUR 1,000 accounts and paper-trades BTC/EUR only.
+Use `examples/paper/quotes.json` instead for [quote-based execution](quotes.md),
+with separate accounts/state; keep only one runner on the shared scanner state.
 AAPL is scanned but is not enabled in the example paper accounts.
 
 Disable any existing scheduled scanner task before starting this workflow. Do not
@@ -87,8 +89,9 @@ Exit codes: `0` Ctrl+C shutdown, `1` fatal error, `3` another runner owns the st
 Financial transactions commit or roll back independently of console delivery.
 
 Five-minute checks do not create five-minute strategies or immediate fills. Daily
-closed candles and the **next-closed-daily-open** fill model are unchanged. Faster
-quote-based execution is a separate improvement. No broker, real funds, API,
+closed strategy candles are unchanged. The original example retains the
+**next-closed-daily-open** model; the new quote example selects public bid/ask
+execution with its own freshness/timing checks. No broker, real funds, API,
 external notification, hosted infrastructure, or background service is enabled.
 
 ## Reporting reads

@@ -110,3 +110,11 @@ network commands may require the supported network permission mechanism.
 Yahoo returned HTTP 429 for a separate generic HTTP probe during validation;
 the actual yfinance request succeeded. If the provider throttles a later run,
 retain the failure and retry later rather than silently using another source.
+
+## Public execution quotes
+
+[Quote-based paper execution](quotes.md) uses public Kraken BTC/EUR bid/ask data
+separately from these historical daily datasets. It records request/receipt times,
+optional provider time, explicit receipt fallback, and immutable quote evidence.
+Quotes do not become candles or change historical backtest inputs. Stocks are not
+supported by this quote policy.

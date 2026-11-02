@@ -8,6 +8,7 @@ local. No pruning, record deletion, or scheduled cleanup runs automatically.
 | `data/scanner/scanner.sqlite3` | Progress, signals, canonical JSON reports, failure summaries | Keep; scanner authority and paper input |
 | `data/scanner/snapshots/` | Original fetches and versioned cumulative datasets | Keep referenced snapshots and lineage |
 | `data/paper/paper.sqlite3` | Account policy, cash, positions, orders, fills, decisions, ledger, latest valuations | Keep; financial authority |
+| `data/paper-quotes/inputs/quotes/` | Bid/ask observations used for entry, execution, and marks | Keep with quote-policy accounts |
 | `data/paper/inputs/` | Market data, FX, and stock-action evidence used by paper processing | Keep with the accounts |
 | `runner-lock.sqlite3` in each state root | Main-runner ownership | Leave in place; file existence does not mean an active lock |
 | Scanner report/export directories | Generated JSON/Markdown and failure summaries | Optional; regenerate from scanner DB |
@@ -44,7 +45,8 @@ are original report observations; export a new directory for current streak tota
 Scanner schema 1 upgrades transactionally to 2 on a successful scanner operation
 (including explicit export). Existing reports/signals/progress remain intact;
 the new table holds failure summaries. Paper reads scanner schemas 1 and 2 without
-modifying either. Paper schema/policy and strategy/fill semantics are unchanged.
+modifying either. Paper database schema remains 1. Existing daily policy hashes remain unchanged;
+new quote accounts use version-2 policy and evidence without a schema migration.
 Older scanner versions cannot open schema 2: back up before upgrading and use a
 matching code/state backup for rollback. Scanner version 2 may perform a one-time
 policy recheck; unchanged signal IDs remain deduplicated.
@@ -89,3 +91,8 @@ snapshots/inputs as cleanup. A whole retired experiment may be archived separate
 once no active workflow references it. Financial records have no age-based expiry.
 Task-wrapper logs still have no automatic rotation; rotate only while the task is
 stopped. No tax-retention period is asserted by these software storage rules.
+
+Quote-policy examples use `data/paper-quotes/` instead of `data/paper/`. Apply the
+same full-state backup rules to whichever roots you use. Ongoing quote marks
+produce more frequent evidence than daily snapshots; no automatic retention
+expiry is introduced. See [quote evidence](quotes.md).

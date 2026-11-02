@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -12,6 +12,7 @@ from crow_trading.backtesting.risk import entry_rejection, loss_stop
 from crow_trading.data.models import DataError
 from crow_trading.paper.config import PAPER_VERSION, Account, Asset
 from crow_trading.paper.portfolio import assets, pending, position, price, size, value
+from crow_trading.paper.quotes import QUOTE_VERSION, MarketQuote, archive_quote
 from crow_trading.paper.source import DailyBarAdapter, Quote, Source
 from crow_trading.paper.state import State
 from crow_trading.scanner.config import digest
@@ -37,8 +38,8 @@ def create_order(
         return order_id
     policy = {
         "delay_seconds": account.settings.delivery_delay_seconds,
-        "fill_policy": "next_closed_daily_open",
-        "version": PAPER_VERSION,
+        "fill_policy": account.fill_policy,
+        "version": QUOTE_VERSION if account.quote_policy else PAPER_VERSION,
     }
     state.connection.execute(
         "INSERT INTO orders VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -78,18 +79,63 @@ def fill_order(
     account: Account,
     asset: Asset,
     order: dict[str, Any],
-    quote: Quote,
+    quote: Quote | None,
     source: Source,
     now: datetime,
+    *,
+    execution: MarketQuote | None = None,
 ) -> None:
     balance = state.balance(account.name)
     quantity, basis = position(state, account.name, asset.instrument.key)
     settings = replace(account.settings, costs=asset.costs)
-    stamp = quote.candle.timestamp
+    evidence: dict[str, Any] = {}
+    if execution is not None:
+        if account.quote_policy is None:
+            raise DataError("quote execution requires a quote-policy account")
+        policy = json.loads(order["policy_json"])
+        if (
+            policy["fill_policy"] != account.fill_policy
+            or policy["version"] != QUOTE_VERSION
+        ):
+            raise DataError("order execution policy mismatch")
+        threshold = datetime.fromisoformat(order["created_at"]) + timedelta(
+            seconds=policy["delay_seconds"]
+        )
+        execution.validate(
+            asset.instrument,
+            now,
+            account.quote_policy,
+            source.config.mode,
+            after=threshold,
+        )
+        identity = archive_quote(source.config.state_dir, execution)
+        evidence = {
+            "fill_policy": account.fill_policy,
+            "quote_fingerprint": identity,
+            "quote_observed_at": execution.received_at.isoformat(),
+            "quote_timestamp_basis": execution.timestamp_basis,
+            "bid_quote": str(execution.bid),
+            "ask_quote": str(execution.ask),
+        }
+        state.event(
+            [order["id"], "execution_quote", identity],
+            account.name,
+            now,
+            "execution_quote",
+            {"order_id": order["id"], **evidence},
+        )
+        stamp = now
+        raw = execution.ask if order["side"] == "buy" else execution.bid
+        dataset_fingerprint = None
+    else:
+        if quote is None or account.quote_policy is not None:
+            raise DataError("daily execution requires a daily-bar account and quote")
+        stamp = quote.candle.timestamp
+        raw = number(quote.candle.open)
+        dataset_fingerprint = quote.dataset_fingerprint
     book = source.fx(account)
     rate = book.rate(asset.instrument.currency, settings.account_currency, stamp)
     eur = book.rate("EUR", settings.account_currency, stamp)
-    raw = number(quote.candle.open)
     fill = price(raw, order["side"], settings)
     reason: str | None = None
     if order["side"] == "buy":
@@ -97,6 +143,16 @@ def fill_order(
             reason = "already_long"
         elif balance.stopped or balance.risk_halted:
             reason = "account_stopped"
+        if execution is not None:
+            held = sum(
+                number(row["quantity"]) > 0
+                for row in state.rows(
+                    "SELECT quantity FROM positions WHERE account_id=?", (account.name,)
+                )
+            )
+            slots = held + sum(o["side"] == "buy" for o in pending(state, account.name))
+            if slots > account.max_positions:
+                reason = "position_count_limit"
         quantity = size(
             settings.target_eur * eur, fill, rate, settings.costs.quantity_step
         )
@@ -121,7 +177,7 @@ def fill_order(
                 price_quote=fill,
                 rate=rate,
                 fee=fee,
-                raw_quote=raw,
+                raw_quote=execution.bid if execution else raw,
                 position_cap=settings.max_position_eur * eur,
                 settings=settings,
                 equity_before=valuation.equity,
@@ -148,7 +204,8 @@ def fill_order(
     old_basis = basis
     old_quantity = portfolio.quantity
     pnl = ZERO
-    impact = quantity * abs(fill - raw) * rate
+    reference = (execution.bid + execution.ask) / 2 if execution else raw
+    impact = quantity * abs(fill - reference) * rate
     if order["side"] == "buy":
         portfolio.buy(quantity, fill * rate, fee, impact)
     else:
@@ -174,7 +231,8 @@ def fill_order(
         "realized_pnl": str(pnl),
         "cash_delta": str(portfolio.cash - balance.cash),
         "cash_after": str(portfolio.cash),
-        "dataset_fingerprint": quote.dataset_fingerprint,
+        "dataset_fingerprint": dataset_fingerprint,
+        **evidence,
         "fx_fingerprint": source.fx_fingerprint,
         "action_fingerprints": sorted(source.actions),
     }

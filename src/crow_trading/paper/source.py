@@ -7,11 +7,13 @@ import sqlite3
 import tempfile
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from crow_trading.backtesting.market import FXBook, check_actions
+from crow_trading.backtesting.models import number
 from crow_trading.data.models import Candle, DataError, Dataset, Request
 from crow_trading.data.normalize import schedule, validate
 from crow_trading.data.storage import fingerprint, load, save
@@ -49,6 +51,12 @@ class Quote:
     dataset_fingerprint: str
     mark_price: float | None = None
     mark_time: datetime | None = None
+
+
+@dataclass(frozen=True)
+class PriceMark:
+    price: Decimal
+    evidence: dict[str, Any]
 
 
 class Source:
@@ -140,6 +148,29 @@ class Source:
 
     def fx(self, account: Account) -> FXBook:
         return FXBook(self.fx_raw, account.settings.fx_max_age_hours)
+
+    def entry_price(self, asset: Asset, when: datetime, max_age: int) -> Decimal:
+        return number(
+            self.mark(asset, when, current=True, max_age=max_age).candle.close
+        )
+
+    def decision_evidence(self, asset: Asset) -> dict[str, Any]:
+        return {}
+
+    def valuation_mark(
+        self, asset: Asset, when: datetime, *, current: bool, max_age: int
+    ) -> PriceMark:
+        quote = self.mark(asset, when, current=current, max_age=max_age)
+        return PriceMark(
+            number(
+                quote.mark_price if quote.mark_price is not None else quote.candle.close
+            ),
+            {
+                "candle_timestamp": quote.candle.timestamp.isoformat(),
+                "price_time": (quote.mark_time or quote.candle.closed_at).isoformat(),
+                "dataset_fingerprint": quote.dataset_fingerprint,
+            },
+        )
 
     def mark(
         self, asset: Asset, when: datetime, *, current: bool, max_age: int

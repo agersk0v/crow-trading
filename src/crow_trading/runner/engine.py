@@ -12,6 +12,7 @@ from typing import Any
 from crow_trading.data.models import DataError
 from crow_trading.paper.config import Config
 from crow_trading.paper.engine import initialize, step
+from crow_trading.paper.quotes import QuoteFetcher
 from crow_trading.runner.reporting import activity, check_accounts, snapshot
 from crow_trading.scanner.engine import ScanResult, scan
 from crow_trading.scanner.providers import Fetcher
@@ -53,6 +54,7 @@ def run(
     fetcher: Fetcher | None = None,
     scan_tick: Callable[[], ScanResult] | None = None,
     paper_tick: Callable[[], dict[str, Any]] | None = None,
+    quote_fetcher: QuoteFetcher | None = None,
 ) -> None:
     """Immediate tick, then fixed delay after completion; never queue catch-up.
 
@@ -112,7 +114,13 @@ def run(
             # No-change and degraded scans still allow safe pending-order processing.
             paper_result = None
             try:
-                paper_result = paper_tick() if paper_tick else step(config, now())
+                paper_result = (
+                    paper_tick()
+                    if paper_tick
+                    else step(config, clock=now, quote_fetcher=quote_fetcher)
+                    if config.quote_policy
+                    else step(config, now())
+                )
                 degraded = degraded or paper_result["status"] != "success"
             except (Busy, OSError, sqlite3.OperationalError) as exc:
                 degraded = True

@@ -44,12 +44,11 @@ def entry_reservation(
     if held + sum(order["side"] == "buy" for order in orders) >= account.max_positions:
         return ZERO, "position_count_limit"
     settings = replace(account.settings, costs=asset.costs)
-    quote = source.mark(asset, now, current=True, max_age=account.mark_max_age_seconds)
     book = source.fx(account)
     rate = book.rate(asset.instrument.currency, settings.account_currency, now)
     eur = book.rate("EUR", settings.account_currency, now)
     target = settings.target_eur * eur
-    raw = number(quote.candle.close)
+    raw = source.entry_price(asset, now, account.mark_max_age_seconds)
     fill = price(raw, "buy", settings)
     quantity = size(target, fill, rate, settings.costs.quantity_step)
     fee = (
@@ -65,7 +64,13 @@ def entry_reservation(
         price_quote=fill,
         rate=rate,
         fee=fee,
-        raw_quote=raw,
+        raw_quote=(
+            source.valuation_mark(
+                asset, now, current=True, max_age=account.mark_max_age_seconds
+            ).price
+            if account.quote_policy
+            else raw
+        ),
         position_cap=settings.max_position_eur * eur,
         settings=settings,
         equity_before=valuation.equity,

@@ -1,6 +1,6 @@
 # Implementation
 
-Status: phases 0–4, the scanner milestone, and the main runner are implemented; simulation limits remain explicit below. Complete phases in order through linked issues and PRs. AI agents must never merge.
+Status: phases 0–5, the scanner milestone, and the main runner are implemented; simulation limits remain explicit below. Complete phases in order through linked issues and PRs. AI agents must never merge.
 
 ## 0. Foundation
 - [x] Add `pyproject.toml`, Python version policy, dependency locking, `.gitignore`, and README commands.
@@ -46,7 +46,7 @@ Status: phases 0–4, the scanner milestone, and the main runner are implemented
 - [x] Respect actual receipt time, later-session opens, public-data delays, market minimums, fees, FX, and no-action stock coverage.
 - [x] Provide one-shot worker, inspect/export/control CLI, immutable input archives, schema guards, and synthetic end-to-end tests.
 - Delivered: [local paper workflow](paper.md). No real orders, broker APIs, active schedules, remote APIs, or deployment infrastructure.
-- Remaining: real-time quote execution, partial fills/liquidity/settlement, and split/dividend accounting are unsupported. Daily-bar confirmations are approximations, not real broker fills.
+- Remaining: partial fills/liquidity/settlement and split/dividend accounting are unsupported. The original policy keeps delayed daily-bar confirmations; optional BTC/EUR quote execution is delivered in phase 5. Neither model reproduces real broker fills.
 
 ## 4.5. Main runner (issue #13)
 - [x] Foreground command initializes/resumes accounts and runs scanner → paper immediately.
@@ -55,20 +55,20 @@ Status: phases 0–4, the scanner milestone, and the main runner are implemented
 - [x] Test offline buy/sell/restart, failures, concurrency, process-death lock release, and interrupt rollback.
 - Delivered: [runner commands/contracts](runner.md). Daily strategies and fill semantics unchanged; no active tasks or services installed.
 
+## 5. Quote-based crypto paper execution (issue #21)
+- [x] Keep strategy evaluation on completed daily candles; start with Kraken BTC/EUR only.
+- [x] Fetch timestamped public bid/ask quotes separately from daily strategy data. Reject stale, invalid, or unavailable quotes; never use a quote observed before order creation for a new fill.
+- [x] Add an explicit quote-based paper fill policy: buy at ask, sell at bid, apply configured fees/slippage and market quantity/minimum rules without double-counting spread. Full fills remain a documented approximation; no liquidity or partial-fill claim.
+- [x] Use fresh quotes for paper holdings valuation and risk observation. Fetch network data outside financial write transactions; archive the evidence used for fills/marks.
+- [x] Preserve the existing daily-bar policy for existing accounts. Version the new policy and require a new account ID rather than silently converting saved experiments.
+- [x] Test timing, stale quotes, fees, reservations, risk limits, restart/deduplication, and provider outages with deterministic offline fixtures. Update commands and contracts.
+- Delivered: [quote execution](quotes.md), explicit `examples/paper/quotes.json`, offline acceptance cases, and unchanged legacy fixture/policy hashes. Full fills and receipt-time freshness remain documented approximations; no real orders.
+
 ## Next steps
 
-The milestones below are planned, not implemented. Start with phase 5; create a
+The milestones below are planned, not implemented. Start with phase 6; create a
 linked issue and PR for each bounded change. Do not change strategy parameters,
 reset existing accounts, or activate live trading as part of these milestones.
-
-### 5. Quote-based crypto paper execution — next
-- [ ] Keep strategy evaluation on completed daily candles; start with Kraken BTC/EUR only.
-- [ ] Fetch timestamped public bid/ask quotes separately from daily strategy data. Reject stale, invalid, or unavailable quotes; never use a quote observed before order creation for a new fill.
-- [ ] Add an explicit quote-based paper fill policy: buy at ask, sell at bid, apply configured fees/slippage and market quantity/minimum rules without double-counting spread. Full fills remain a documented approximation; no liquidity or partial-fill claim.
-- [ ] Use fresh quotes for paper holdings valuation and risk observation. Fetch network data outside financial write transactions; archive the evidence used for fills/marks.
-- [ ] Preserve the existing daily-bar policy for existing accounts. Version the new policy and require a new account ID rather than silently converting saved experiments.
-- [ ] Test timing, stale quotes, fees, reservations, risk limits, restart/deduplication, and provider outages with deterministic offline fixtures. Update commands and contracts.
-- Done when: a daily signal can create a simulated order and fill from a valid subsequent quote in the same runner cycle, without waiting for another daily candle to close or placing a real order.
 
 ### 6. Validate the ongoing paper workflow and results
 - [ ] Add an offline end-to-end quote-policy demo covering entry, holding, exit, outages, and restart.
