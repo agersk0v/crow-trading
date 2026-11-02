@@ -229,3 +229,12 @@ recovery, loss halts, process interruption, uncertain commit acknowledgement,
 actual process exit, migrations, read-only scanner handoff, and CLI exports.
 The documented synthetic demo was executed. Default tests use no network or
 credentials. No real broker integration or active schedule was tested or enabled.
+
+## Internal organization
+
+`engine.py` owns initialization and step transactions. `portfolio.py` owns marks
+and valuation records; `orders.py` owns simulated execution; `risk.py` and
+`signals.py` own entry/risk checks and strategy decisions. These modules use the
+same SQLite transaction and existing policy/version contracts. The cleanup does
+not migrate state or change fills. Valuation totals read only the account's
+fills and decode each record once.

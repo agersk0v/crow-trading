@@ -13,6 +13,11 @@
 - Do not bypass these rules through Git commands, APIs, automation, or another agent.
 - Do not change repository settings, branch protections, or publish releases.
 
+## Paper/runner maintenance
+- Preserve `paper.engine.initialize` and `step` as transaction entry points. Portfolio, orders, risk, and signal decisions live in focused modules.
+- Runner summaries use incremental activity reads; never weaken ledger reconciliation or treat console cursors as financial acknowledgements.
+- Share synthetic market fixtures via `tests/helpers/paper.py`, not imports between test modules.
+
 ## Work rules
 - Inspect relevant files and existing tests before editing.
 - Make the smallest change that satisfies the issue. Preserve unrelated user changes.

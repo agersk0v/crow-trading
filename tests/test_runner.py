@@ -18,7 +18,7 @@ from crow_trading.runner.__main__ import main
 from crow_trading.runner.engine import ownership, run
 from crow_trading.scanner.engine import ScanResult, scan
 from crow_trading.scanner.state import Busy
-from tests.test_paper import T0, Harness
+from tests.helpers.paper import T0, Harness
 
 
 class Timeline:
