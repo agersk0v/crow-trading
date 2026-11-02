@@ -1,6 +1,6 @@
 # Implementation
 
-Status: phases 0–2, the scanner milestone, and local paper trading are implemented; simulation limits remain explicit below. Complete phases in order through linked issues and PRs. AI agents must never merge.
+Status: phases 0–4, the scanner milestone, and the main runner are implemented; simulation limits remain explicit below. Complete phases in order through linked issues and PRs. AI agents must never merge.
 
 ## 0. Foundation
 - [x] Add `pyproject.toml`, Python version policy, dependency locking, `.gitignore`, and README commands.
@@ -29,7 +29,7 @@ Status: phases 0–2, the scanner milestone, and local paper trading are impleme
 ### Remaining simulation limitations
 - [ ] Implement and validate split/dividend accounting before accepting windows containing corporate actions; current runs reject them.
 - [ ] Add partial fills, liquidity/volume constraints, corporate-action cash timing, and more detailed FX execution costs if required by later research.
-- [ ] Multi-asset/shared portfolio simulation is not implemented; current comparisons use independent single-symbol accounts.
+- [ ] Multi-asset/shared portfolio backtesting is not implemented; backtest comparisons use independent single-symbol accounts. Local paper accounts support shared cash/risk across assets.
 
 ## 3.5. Daily watchlist scanner (issue #9)
 - [x] Typed crypto/stock watchlists and versioned strategy configuration.
@@ -54,6 +54,13 @@ Status: phases 0–2, the scanner milestone, and local paper trading are impleme
 - [x] Print new orders/fills and account summaries with valuation freshness and explicit errors.
 - [x] Test offline buy/sell/restart, failures, concurrency, process-death lock release, and interrupt rollback.
 - Delivered: [runner commands/contracts](runner.md). Daily strategies and fill semantics unchanged; no active tasks or services installed.
+
+## Maintenance: paper/runner cleanup (issue #15)
+- [x] Extract portfolio, orders, risk, and signal decisions from paper transaction orchestration.
+- [x] Read focused runner summaries and incremental activity without copying full audit tables for reporting; retain full reconciliation.
+- [x] Decode valuation fills once per record and limit that query to the account.
+- [x] Share deterministic market fixtures in `tests/helpers/paper.py`; clarify backtesting-only limitations.
+- Existing commands, account policies, database schema, strategy/risk/fill semantics, and output remain unchanged.
 
 ## Deferred: live trading
 Do not implement or activate live trading during MVP work. A separate explicit request must resolve Danish broker eligibility, API terms, fees, precision, tax reporting, credentials, reconciliation, and kill-switch requirements.

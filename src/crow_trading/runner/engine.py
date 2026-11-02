@@ -1,6 +1,5 @@
 """Sequential, restartable cycles; no changes to strategy or fill semantics."""
 
-import json
 import math
 import sqlite3
 import time
@@ -13,7 +12,7 @@ from typing import Any
 from crow_trading.data.models import DataError
 from crow_trading.paper.config import Config
 from crow_trading.paper.engine import initialize, step
-from crow_trading.paper.operations import inspect
+from crow_trading.runner.reporting import activity, check_accounts, snapshot
 from crow_trading.scanner.engine import ScanResult, scan
 from crow_trading.scanner.providers import Fetcher
 from crow_trading.scanner.state import Busy
@@ -44,87 +43,6 @@ def ownership(roots: tuple[Path, ...]) -> Iterator[None]:
         yield
 
 
-def checked_snapshot(config: Config) -> dict[str, Any]:
-    snapshot = inspect(config.state_dir)
-    if snapshot["reconciliation_errors"]:
-        raise DataError(
-            f"account reconciliation failed: {snapshot['reconciliation_errors']}"
-        )
-    return snapshot
-
-
-def activity(
-    config: Config,
-    snapshot: dict[str, Any],
-    seen_orders: set[str],
-    seen_fills: set[str],
-    emit: Callable[[str], None],
-    now: datetime,
-    paper_result: dict[str, Any] | None,
-) -> None:
-    prefix = now.isoformat()
-    names = {a.name for a in config.accounts}
-    symbols = {
-        a.instrument.key: a.instrument.symbol for c in config.accounts for a in c.assets
-    }
-    orders = [r for r in snapshot["orders"] if r["account_id"] in names]
-    fills = [json.loads(r["payload"]) for r in snapshot["fills"]]
-    new_fills = [
-        r for r in fills if r["account_id"] in names and r["order_id"] not in seen_fills
-    ]
-    for order in orders:
-        if order["id"] not in seen_orders:
-            emit(
-                f"{prefix} ORDER {order['account_id']} {order['side'].upper()} "
-                f"{symbols.get(order['instrument_key'], order['instrument_key'])} "
-                f"status={order['status']} id={order['id']} "
-                "(simulated order, not a fill)"
-            )
-    for fill in new_fills:
-        emit(
-            f"{prefix} FILL {fill['account_id']} {fill['side'].upper()} "
-            f"{fill['quantity']} {fill['symbol']} at {fill['fill_price_quote']} "
-            f"{fill['quote_currency']} fee={fill['fee_account']} "
-            f"{fill['account_currency']} "
-            f"effective_at={fill['effective_at']} recorded_at={fill['recorded_at']}"
-        )
-    emit(f"{prefix} Trades: {len(new_fills)} new simulated fills.")
-    valuations = {
-        r["account_id"]: json.loads(r["payload"]) for r in snapshot["valuations"]
-    }
-    results = {r["account"]: r for r in (paper_result or {}).get("accounts", [])}
-    for account in snapshot["accounts"]:
-        name = account["id"]
-        if name not in names:
-            continue
-        valuation = valuations.get(name)
-        current = bool(
-            valuation and valuation["as_of"] == (paper_result or {}).get("as_of")
-        )
-        value = (
-            f"holdings={valuation['holdings']} total={valuation['equity']} "
-            f"valuation_at={valuation['as_of']} {'current' if current else 'stale'}"
-            if valuation
-            else "holdings=unavailable total=unavailable valuation=unavailable"
-        )
-        currency = next(
-            a.settings.account_currency for a in config.accounts if a.name == name
-        )
-        pending = sum(
-            r["account_id"] == name and r["status"] == "pending" for r in orders
-        )
-        emit(
-            f"{prefix} ACCOUNT {name} ({currency}) cash={account['cash']} "
-            f"reserved={account['reserved']} {value} pending={pending} "
-            f"stopped={bool(account['stopped'])} "
-            f"risk_halted={bool(account['risk_halted'])}"
-        )
-        for error in results.get(name, {}).get("errors", []):
-            emit(f"{prefix} ERROR {name}: {error}")
-    seen_orders.update(r["id"] for r in orders)
-    seen_fills.update(r["order_id"] for r in fills)
-
-
 def run(
     config: Config,
     interval: float = 300,
@@ -146,9 +64,7 @@ def run(
         raise DataError("interval must be a finite positive number of seconds")
     with ownership((config.state_dir, config.watchlist.state_dir)):
         initialize(config, now())
-        snapshot = checked_snapshot(config)
-        seen_orders = {r["id"] for r in snapshot["orders"]}
-        seen_fills = {r["order_id"] for r in snapshot["fills"]}
+        cursor = snapshot(config).cursor
         emit(
             f"{now().isoformat()} Runner started: simulated funds only; "
             f"interval={interval:g}s."
@@ -157,7 +73,7 @@ def run(
             # Revalidate immutable policies, clock, and ledger before market work.
             try:
                 initialize(config, now())
-                checked_snapshot(config)
+                check_accounts(config)
             except (Busy, OSError, sqlite3.OperationalError) as exc:
                 emit(
                     f"{now().isoformat()} ERROR state unavailable: {exc}; "
@@ -195,10 +111,9 @@ def run(
                 emit(f"{now().isoformat()} ERROR paper: {exc}")
             # DataError/unknown failures intentionally propagate: no unsafe retries.
             try:
-                snapshot = checked_snapshot(config)
-                activity(
-                    config, snapshot, seen_orders, seen_fills, emit, now(), paper_result
-                )
+                report = snapshot(config, cursor)
+                activity(config, report, emit, now(), paper_result)
+                cursor = report.cursor
             except Busy as exc:
                 degraded = True
                 emit(f"{now().isoformat()} ERROR account summary unavailable: {exc}")

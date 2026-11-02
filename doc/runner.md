@@ -90,3 +90,17 @@ Five-minute checks do not create five-minute strategies or immediate fills. Dail
 closed candles and the **next-closed-daily-open** fill model are unchanged. Faster
 quote-based execution is a separate improvement. No broker, real funds, API,
 external notification, hosted infrastructure, or background service is enabled.
+
+## Reporting reads
+
+Runner summaries fetch account balances, valuations, pending counts, and only new
+order/fill activity. Session-local row cursors advance after successful output;
+a busy summary read leaves its activity available for the next cycle. Startup
+sets cursors to existing history, preserving the no-replay behavior. These are
+console cursors, not financial acknowledgements. Do not manually delete or
+rewrite database rows while running.
+
+Full ledger reconciliation still runs before processing and reporting, including
+historical accounts outside the selected configuration. It still reads history;
+this cleanup reduces reporting copies rather than making total cycle cost
+independent of history. Full inspect/export commands remain available.

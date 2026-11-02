@@ -15,7 +15,12 @@ Implemented modules under `src/crow_trading/`:
 - `backtesting/experiment.py`: frozen configuration/input hashes and protocol versions.
 - `backtesting/metrics.py`, `reports.py`: ledger/equity CSV, metrics/benchmarks JSON, and standalone SVG charts.
 - Deterministic tests in `tests/`; synthetic examples in `examples/backtesting/`.
-- `paper/`: immutable account config, separate transactional SQLite accounting, read-only scanner handoff, archived inputs, daily-bar paper adapter, risk/reservations, reconciliation, and local inspect/control/export commands.
+- `paper/engine.py`: initialization and step transaction boundaries.
+- `paper/portfolio.py`: portfolio queries, price/quantity arithmetic, marks, and valuation records.
+- `paper/orders.py`: order creation, full fills, and pending-order reconciliation.
+- `paper/risk.py`, `signals.py`: shared entry/risk checks and scanner-signal validation/decisions.
+- `paper/config.py`, `state.py`, `source.py`, `operations.py`: immutable policy, SQLite accounting/reconciliation, read-only scanner inputs/daily-bar adapter, and inspect/control/export.
+- `runner/reporting.py`: focused account summaries and incremental session activity; full financial reconciliation remains unchanged.
 - `runner/`: foreground scanner → paper orchestration, five-minute completion-relative
   delay, ownership locks for both state roots, and concise session activity output.
 - Real broker and accounting/tax integrations remain future work. No live adapters.
@@ -49,8 +54,8 @@ Each paper account selects exactly one strategy and shares cash/risk across its 
 
 The version-1 adapter simulates full fills at the first scheduled open after actual order creation, confirming only after that daily bar is published. It never uses an earlier open. Inputs, effective/recorded fill times, fees, FX, balances, cost basis, and decisions remain auditable. Unknown states fail reconciliation before more orders are processed. Manual stop cancels entries but leaves exits/reconciliation active. See [paper contracts](paper.md) for timing approximations, supported states, migrations, controls, and limitations.
 
-## Simulation limits
-Each dataset, evaluation window, and benchmark has an independent one-symbol account. No multi-asset portfolio or shared exposure accounting is implied. Indicators may warm from earlier bars, but cash and holdings reset per window. Full fills occur at eligible bar opens; no intrabar execution or guaranteed stop prices.
+## Backtesting simulation limits
+Each backtest dataset, evaluation window, and benchmark has an independent one-symbol account. No multi-asset portfolio or shared exposure accounting is implied. Indicators may warm from earlier bars, but cash and holdings reset per window. Full fills occur at eligible bar opens; no intrabar execution or guaranteed stop prices.
 
 Stock action coverage is mandatory. Only unadjusted, attested no-action windows are supported; splits/dividends and adjusted-price execution fail. FX snapshots must supply rates already available at each fill/mark and pass age checks. See [backtesting contracts](backtesting.md).
 

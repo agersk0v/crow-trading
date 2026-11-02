@@ -99,3 +99,8 @@ Press Ctrl+C to stop; run the same command to resume without resetting balances.
 Keep the computer awake and process running. Disable the old scheduled scanner task
 before using it. Daily strategies and delayed daily-bar fills are unchanged.
 See [runner setup and recovery](doc/runner.md). No real money is used.
+
+Paper transaction orchestration, portfolio valuation, order execution, risk, and
+signal decisions live in focused modules. Runner reporting reads incremental
+activity while retaining full ledger reconciliation; commands and saved-state
+formats are unchanged. See [architecture](doc/architecture.md).
