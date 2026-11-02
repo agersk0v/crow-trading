@@ -89,7 +89,15 @@ def run(
                     else scan(config.watchlist, clock=now, fetcher=fetcher)
                 )
                 status = result.report["status"] if result.report else "no_changes"
-                emit(f"{now().isoformat()} SCAN {status}")
+                summary = (
+                    result.report.get("failure_summary") if result.report else None
+                )
+                detail = (
+                    f" failures={summary['occurrences']} since={summary['first_seen']}"
+                    if summary
+                    else ""
+                )
+                emit(f"{now().isoformat()} SCAN {status}{detail}")
                 degraded = bool(result.exit_code)
                 for item in result.instruments:
                     if item.get("status") == "error":

@@ -518,6 +518,8 @@ def test_missing_stock_action_evidence_defers_without_reserving_money(
 
 def test_scanner_state_and_reports_are_not_modified(tmp_path: Path) -> None:
     h = Harness(tmp_path)
+    h.watchlist = replace(h.watchlist, export_reports=True)
+    h.config = replace(h.config, watchlist=h.watchlist)
     h.scan()
     files = [
         h.watchlist.state_dir / "scanner.sqlite3",
@@ -741,3 +743,84 @@ def test_spread_slippage_and_fractional_fill_accounting(
     assert D(h.rows("accounts")[0]["cash"]) == D(final_cash)
     assert D(h.rows("accounts")[0]["reserved"]) == 0
     assert inspect(h.config.state_dir)["reconciliation_errors"] == {}
+
+
+def test_paper_archive_links_immutable_prices_and_survives_source_unlink(
+    tmp_path: Path,
+) -> None:
+    import os
+
+    h = Harness(tmp_path)
+    h.scan()
+    initialize(h.config, T0)
+    h.step()
+    originals = {
+        path.name: path
+        for path in (h.watchlist.state_dir / "snapshots").glob("*.parquet")
+    }
+    archives = list((h.config.state_dir / "inputs").glob("*.parquet"))
+    assert archives
+    target = archives[0]
+    original = originals[target.name]
+    assert os.path.samefile(original, target)
+    # Remove one directory entry only; a hard link keeps the archive alive.
+    expected = target.read_bytes()
+    original.unlink()
+    assert target.read_bytes() == expected
+
+
+def test_paper_archive_verified_copy_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    h = Harness(tmp_path)
+    h.scan()
+    initialize(h.config, T0)
+    link = os.link
+
+    def unsupported(source: str | Path, destination: str | Path) -> None:
+        if Path(source).parent == h.watchlist.state_dir / "snapshots":
+            raise OSError("cross-device link")
+        link(source, destination)
+
+    monkeypatch.setattr(os, "link", unsupported)
+    assert h.step()["status"] == "success"
+    originals = {
+        path.name: path
+        for path in (h.watchlist.state_dir / "snapshots").glob("*.parquet")
+    }
+    archives = list((h.config.state_dir / "inputs").glob("*.parquet"))
+    assert archives
+    assert all(not os.path.samefile(originals[path.name], path) for path in archives)
+    assert all(
+        originals[path.name].read_bytes() == path.read_bytes() for path in archives
+    )
+
+
+def test_existing_corrupt_archive_is_not_overwritten(tmp_path: Path) -> None:
+    h = Harness(tmp_path)
+    h.scan()
+    initialize(h.config, T0)
+    h.step()
+    target = next((h.config.state_dir / "inputs").glob("*.parquet"))
+    target.unlink()  # Separate a corrupt archive from the still-valid source inode.
+    target.write_bytes(b"invalid archive")
+    result = h.step(2)
+    assert result["status"] == "degraded"
+    assert target.read_bytes() == b"invalid archive"
+    assert not h.rows("fills")
+    assert D(h.rows("accounts")[0]["cash"]) == 1000
+
+
+def test_paper_reads_legacy_scanner_schema_without_migrating_it(tmp_path: Path) -> None:
+    h = Harness(tmp_path)
+    h.scan()
+    path = h.watchlist.state_dir / "scanner.sqlite3"
+    with sqlite3.connect(path) as db:
+        db.execute("DROP TABLE failure_streaks")
+        db.execute("PRAGMA user_version=1")
+    before = path.read_bytes()
+    initialize(h.config, T0)
+    assert h.step()["status"] == "success"
+    assert path.read_bytes() == before

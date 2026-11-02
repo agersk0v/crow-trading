@@ -17,6 +17,7 @@ def create(destination: Path) -> None:
     now = datetime.now(UTC)
     original = json.loads(Path(__file__).with_name("watchlist.json").read_text())
     original["state_dir"] = "state"
+    original["export_reports"] = True
     original["provider_interval_seconds"] = 0
     for raw in original["instruments"]:
         raw["provider"] = "snapshot"

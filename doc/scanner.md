@@ -1,9 +1,9 @@
-# Daily watchlist scanner (version 1)
+# Daily watchlist scanner (version 2)
 
 One command fetches completed daily bars, evaluates configured strategies, and
-writes local JSON/Markdown reports. It creates no orders, portfolios, alerts,
-or active scheduled tasks. Strategies are unchanged; this module automates their
-data-and-signal workflow before Phase 4 paper execution.
+saves signals/reports in SQLite. Report files are optional. The scanner does not
+place orders. For normal paper operation use the [combined runner](runner.md);
+the standalone commands and alternative schedules below remain available.
 
 ## Try it offline
 From the repository root after `uv sync --locked`:
@@ -39,6 +39,8 @@ apply. See [data contracts](data.md) and [strategy definitions](strategies.md).
 Configuration paths are relative to the JSON file, not the scheduler's working
 directory. Required top-level fields are `schema_version: 1`, `state_dir`,
 `attempts` (1–5), `provider_interval_seconds` (0–60), and `instruments` (1–100).
+Optional `export_reports` is a boolean, default false. The offline demo opts in
+to report files; the public watchlist does not.
 Keep state on a local filesystem supporting SQLite locks and atomic hard links
 (NTFS/ext4); do not share it across network drives or synchronization services.
 
@@ -71,8 +73,19 @@ adjustment mode; renaming its display label does not create duplicate signals.
 Changing market identity creates a new independent stream. Strategy definitions
 and operational policy are versioned/audited separately.
 
+## Export reports on request
+
+```sh
+uv run --locked python -m crow_trading.scanner export --state data/scanner --output data/scanner-export-001
+```
+
+Use a new directory. The export includes JSON, generated Markdown, and current
+failure streak summaries. Canonical reports remain in SQLite; deleting generated
+exports does not delete trading state. See [storage](storage.md).
+
 ## Daily timing and catch-up
-Invoke the CLI every 15 minutes. It computes the newest bar whose calendar close
+The combined runner checks every five minutes after completion. If running only
+the standalone scanner through a scheduler, 15 minutes is also sufficient. It computes the newest bar whose calendar close
 plus publication delay has passed. Unchanged bars/configuration are skipped
 without network requests or duplicate report files. Crypto uses UTC days; stocks
 use their exchange's sessions, DST, holidays, and early closes. Weekends do not
@@ -115,19 +128,22 @@ retained; appending unrelated history does not duplicate an unchanged signal.
 Policy-only changes are audited without repeating recommendations.
 
 `scanner.sqlite3` atomically stores progress, deduplicated signal records, and the
-full JSON/Markdown report payload. A SQLite write transaction prevents overlapping
+canonical JSON report payload. New Markdown is rendered on export; existing
+stored Markdown is retained unchanged. A SQLite write transaction prevents overlapping
 scans from processing the same state concurrently. Locks release on process exit;
 there is no stale PID lock to delete. Each asset uses a savepoint, so a failed
 provider cannot commit partial records for that asset or suppress healthy ones.
 
-After commit, report files are materialized atomically. On restart, missing files
-are restored from the committed database before further work. A crash before
+With `export_reports: true` (or scanner `--export-reports`), report files are
+materialized atomically after commit and repaired on restart. By default, scans
+neither create report files nor inspect existing report directories. A crash before
 commit retries that batch; it cannot lose an already-published report. Uncommitted
 snapshot files may remain as harmless orphans. Conflicting edited report files
 are preserved and stop the scan: move the modified file aside to keep your notes,
 then rerun to restore the canonical report. Do not edit the database or delete
 referenced snapshots. Back up the entire state directory while the scanner is
-idle. Storage grows with history; pruning/retention is not implemented.
+idle. See [storage and retention](storage.md) for authoritative records, generated
+files, failure summaries, schema upgrades, and backup/cleanup rules.
 
 Transient provider/network errors retry with bounded 1/2/4/8-second backoff
 according to `attempts`. Validation/unsupported-request errors do not retry.
@@ -139,11 +155,14 @@ as a fresh provider response.
 
 Exit codes: `0` success/no changes, `1` invalid config or scan/export/partial
 failure, `3` another scan owns the state. Errors appear per instrument in reports
-and CLI output. If all instruments fail, the run still records a failure report.
+and CLI output. Consecutive identical failure-only scans reuse one immutable report plus a
+first/last observation and count; changed errors, progress, or recovery end the
+streak. Failed invocations remain visible and return exit code 1.
 
 ## Windows Task Scheduler
 Windows integration is documented but was not executed in the Linux development
-environment. No active task is installed by this PR. First verify the manual
+environment. Use these alternate schedules only if you are not using the combined runner.
+No active task is installed automatically. First verify the manual
 public-provider scan and review its reports on your own machine.
 
 `examples/scanner/run-scan.ps1` sets the working directory, invokes the installed

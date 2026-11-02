@@ -62,6 +62,13 @@ Status: phases 0–4, the scanner milestone, and the main runner are implemented
 - [x] Share deterministic market fixtures in `tests/helpers/paper.py`; clarify backtesting-only limitations.
 - Existing commands, account policies, database schema, strategy/risk/fill semantics, and output remain unchanged.
 
+## Maintenance: storage/reporting (issue #17)
+- [x] Default to SQLite-only reports; render Markdown on explicit/opt-in export and preserve legacy reports.
+- [x] Transactionally migrate scanner schema 1 → 2 and summarize identical consecutive failure-only scans.
+- [x] Share immutable price archive files with hard links where supported; retain verified-copy fallback and all referenced evidence.
+- [x] Make the runner the README entry point and document authoritative data, backups, and safe cleanup.
+- Remaining: cumulative history snapshots and full-history financial reconciliation still grow; partitioning and reference-aware pruning are not implemented. No historical records are automatically deleted.
+
 ## Deferred: live trading
 Do not implement or activate live trading during MVP work. A separate explicit request must resolve Danish broker eligibility, API terms, fees, precision, tax reporting, credentials, reconciliation, and kill-switch requirements.
 

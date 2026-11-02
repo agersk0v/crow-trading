@@ -9,11 +9,12 @@ Compare crypto and stock swing strategies after realistic costs. Support local r
 - Offline single-asset backtests with costs, FX, risk checks, isolated evaluation windows, ledger, benchmarks, and charts.
 - Stock simulation supports unadjusted prices only and requires a complete no-corporate-action coverage snapshot. Splits/dividends and adjusted-price fills are rejected, not ignored.
 - FX uses explicit timestamped snapshots; no rates or corporate-action facts are invented. Demo datasets/rates are synthetic and do not measure investment performance.
-- Daily watchlist scans with calendar/publication delays, immutable overlap updates, recoverable deduplication, and local signal reports. Scheduler-ready CLI and Windows/cron guides; no active schedule is installed automatically.
+- Daily watchlist scans with calendar/publication delays, immutable overlap updates, recoverable deduplication, and canonical SQLite reports with optional file exports. Scheduler-ready CLI and Windows/cron guides; no active schedule is installed automatically.
 - Local paper accounts with shared per-account cash/risk across assets, isolated strategy allocation, deterministic full simulated orders/fills, SQLite reconciliation, and manual stop/resume. The initial execution model confirms prospective daily-bar opens after the bar closes.
+- Foreground combined runner with account resume and five-minute scanner → paper cycles.
 - No external notifications, real broker execution, or live trading.
 
-See [data](data.md), [strategies](strategies.md), [backtesting](backtesting.md), [scanner](scanner.md), and [paper trading](paper.md) for commands and precise limitations.
+See [data](data.md), [strategies](strategies.md), [backtesting](backtesting.md), [scanner](scanner.md), [paper trading](paper.md), [runner](runner.md), and [storage](storage.md) for commands and precise limitations.
 
 ## MVP requirements
 - Assets: BTC/EUR, ETH/EUR, and a small liquid stock sample.

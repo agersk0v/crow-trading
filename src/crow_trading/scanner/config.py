@@ -10,7 +10,7 @@ from typing import Any, Literal
 from crow_trading.data.models import DataError
 from crow_trading.strategies import MeanReversion, Momentum, Strategy
 
-SCANNER_VERSION = "1"
+SCANNER_VERSION = "2"
 
 
 def digest(value: object) -> str:
@@ -109,12 +109,16 @@ class Watchlist:
     instruments: tuple[Instrument, ...]
     attempts: int
     provider_interval_seconds: int
+    export_reports: bool = False
 
 
 def read_watchlist(path: Path) -> Watchlist:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if raw["schema_version"] != 1:
         raise DataError("unsupported watchlist schema")
+    export_reports = raw.get("export_reports", False)
+    if not isinstance(export_reports, bool):
+        raise DataError("export_reports must be boolean")
     parsed: list[Instrument] = []
     for value in raw["instruments"]:
         value = dict(value)
@@ -173,4 +177,5 @@ def read_watchlist(path: Path) -> Watchlist:
         tuple(parsed),
         integer(raw["attempts"], "attempts", 1, 5),
         integer(raw["provider_interval_seconds"], "provider interval", 0, 60),
+        export_reports,
     )

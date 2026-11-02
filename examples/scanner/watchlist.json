@@ -2,6 +2,7 @@
   "schema_version": 1,
   "state_dir": "../../data/scanner",
   "attempts": 3,
+  "export_reports": false,
   "provider_interval_seconds": 1,
   "instruments": [
     {

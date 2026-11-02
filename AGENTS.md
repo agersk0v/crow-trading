@@ -13,6 +13,11 @@
 - Do not bypass these rules through Git commands, APIs, automation, or another agent.
 - Do not change repository settings, branch protections, or publish releases.
 
+## Storage
+- Read [storage contracts](doc/storage.md) before changing persistence or retention.
+- Scanner schema 2 retains legacy reports and aggregates identical failure-only scans. Default file exports are off; preserve the opt-in repair/conflict behavior.
+- Never prune financial records or referenced snapshots as incidental cleanup. Immutable paper price archives may share hard-linked file data; never edit either path in place.
+
 ## Paper/runner maintenance
 - Preserve `paper.engine.initialize` and `step` as transaction entry points. Portfolio, orders, risk, and signal decisions live in focused modules.
 - Runner summaries use incremental activity reads; never weaken ledger reconciliation or treat console cursors as financial acknowledgements.
