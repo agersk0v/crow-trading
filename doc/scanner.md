@@ -200,3 +200,11 @@ On 2026-11-01 the public watchlist fetched/evaluated 60 Kraken BTC/EUR daily bar
 and 60 Yahoo AAPL sessions; Friday's stock data was labelled stale on Sunday.
 Synthetic/demo CLI runs verified fixture separation and a duplicate-free no-op
 second invocation. These checks establish functionality, not investment value.
+
+## Combined foreground runner
+
+To run scanner and paper together, use the [main runner](runner.md). It scans
+immediately, processes paper even after no-change/partial scans, and repeats five
+minutes after each completed cycle. Disable your existing scanner scheduled task
+before using it; do not run both scheduling approaches on the same state. No task
+is changed automatically. Daily candle due checks and strategy rules are unchanged.

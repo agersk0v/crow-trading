@@ -85,3 +85,17 @@ scanner signals, review `examples/paper/paper.json`, run `paper init` and then
 EUR 1,000 account and enables BTC/EUR only. Read [paper setup, timing, stop/resume,
 and recovery](doc/paper.md) before scheduling it. Existing scanner tasks do not
 automatically run the paper worker. No real orders or broker credentials exist.
+
+## Run scanner and paper trading together
+
+```sh
+uv run --locked python -m crow_trading.runner examples/paper/paper.json
+```
+
+This foreground command initializes or resumes virtual accounts, scans immediately,
+then processes paper orders. It repeats five minutes after each cycle finishes and
+prints new orders/fills plus cash, reservations, holdings, and total account value.
+Press Ctrl+C to stop; run the same command to resume without resetting balances.
+Keep the computer awake and process running. Disable the old scheduled scanner task
+before using it. Daily strategies and delayed daily-bar fills are unchanged.
+See [runner setup and recovery](doc/runner.md). No real money is used.
