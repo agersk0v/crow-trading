@@ -48,6 +48,13 @@ Status: phases 0–2, the scanner milestone, and local paper trading are impleme
 - Delivered: [local paper workflow](paper.md). No real orders, broker APIs, active schedules, remote APIs, or deployment infrastructure.
 - Remaining: real-time quote execution, partial fills/liquidity/settlement, and split/dividend accounting are unsupported. Daily-bar confirmations are approximations, not real broker fills.
 
+## 4.5. Main runner (issue #13)
+- [x] Foreground command initializes/resumes accounts and runs scanner → paper immediately.
+- [x] Configurable five-minute delay after completion, no overlapping/catch-up cycles, ownership locks on both state directories.
+- [x] Print new orders/fills and account summaries with valuation freshness and explicit errors.
+- [x] Test offline buy/sell/restart, failures, concurrency, process-death lock release, and interrupt rollback.
+- Delivered: [runner commands/contracts](runner.md). Daily strategies and fill semantics unchanged; no active tasks or services installed.
+
 ## Deferred: live trading
 Do not implement or activate live trading during MVP work. A separate explicit request must resolve Danish broker eligibility, API terms, fees, precision, tax reporting, credentials, reconciliation, and kill-switch requirements.
 

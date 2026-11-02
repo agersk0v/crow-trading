@@ -16,6 +16,8 @@ Implemented modules under `src/crow_trading/`:
 - `backtesting/metrics.py`, `reports.py`: ledger/equity CSV, metrics/benchmarks JSON, and standalone SVG charts.
 - Deterministic tests in `tests/`; synthetic examples in `examples/backtesting/`.
 - `paper/`: immutable account config, separate transactional SQLite accounting, read-only scanner handoff, archived inputs, daily-bar paper adapter, risk/reservations, reconciliation, and local inspect/control/export commands.
+- `runner/`: foreground scanner → paper orchestration, five-minute completion-relative
+  delay, ownership locks for both state roots, and concise session activity output.
 - Real broker and accounting/tax integrations remain future work. No live adapters.
 
 ## Contracts
@@ -37,7 +39,8 @@ Implemented modules under `src/crow_trading/`:
 - Keep tax scenarios separate; do not apply a flat tax deduction to every candle.
 
 ## Scanner contracts
-An external scheduler starts the single-run CLI; no scheduler or portfolio logic lives in strategies. SQLite commits progress, signal identities, and report content together under an exclusive write transaction. Missing report projections are repaired; conflicting user edits are preserved. Instrument savepoints isolate provider failures. Immutable source/merged snapshots retain lineage; updates detect revisions only in their fetched overlap.
+An external scheduler starts the single-run CLI, or the foreground main runner
+invokes scanner and paper sequentially; no scheduler or portfolio logic lives in strategies. SQLite commits progress, signal identities, and report content together under an exclusive write transaction. Missing report projections are repaired; conflicting user edits are preserved. Instrument savepoints isolate provider failures. Immutable source/merged snapshots retain lineage; updates detect revisions only in their fetched overlap.
 
 Fresh candidate summaries exclude historical catch-up, revisions, expired records, and offline fixtures. Full snapshot fingerprints preserve provenance while trailing-content hashes prevent duplicates when unrelated history grows. Market calendars and UTC deadlines drive scheduling regardless of the host timezone. See [scanner](scanner.md) for exact state, timing, retry, and recovery contracts. Windows integration is documented, not executed on this Linux host.
 
@@ -55,3 +58,5 @@ Stock action coverage is mandatory. Only unadjusted, attested no-action windows 
 Pinned runtime dependencies: CCXT, yfinance, pandas, exchange-calendars, pyarrow, and Matplotlib. Python 3.12+, Ruff, mypy, and pytest support development; `uv.lock` records transitive versions. Simulation arithmetic uses standard-library Decimal. No broker clients are introduced.
 
 Live execution needs a separate explicit request, disabled-by-default opt-in, preflight checks, reconciliation, exposure caps, a kill switch, and no withdrawal permissions. Follow [agent rules](../AGENTS.md).
+
+See [runner contracts](runner.md) for shutdown, retry, locking, and output limits.

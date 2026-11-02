@@ -4,6 +4,8 @@ This module consumes scanner signals into persistent **simulated** accounts.
 There are no broker adapters, production credentials, real orders, APIs, database
 servers, containers, or deployments. All state lives in local SQLite and immutable
 input files. Existing scanner jobs do not automatically start paper processing.
+The [main runner](runner.md) initializes/resumes accounts and repeats scanner →
+paper together in one foreground process; existing commands below remain available.
 
 ## Test the complete workflow offline
 From the repository root after `uv sync --locked`:

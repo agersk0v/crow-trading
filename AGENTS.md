@@ -4,7 +4,7 @@
 - [Product](doc/product.md): scope and acceptance criteria.
 - [Architecture](doc/architecture.md): boundaries and data rules.
 - [Implementation](doc/implementation.md): ordered tasks.
-- Current state: historical data, pure strategies, daily watchlist scanning, and offline single-asset backtesting. See [scanner contracts](doc/scanner.md). Local paper trading is implemented with simulated accounts/orders only; see [paper contracts](doc/paper.md). See [backtesting limits](doc/backtesting.md).
+- Current state: historical data, pure strategies, daily watchlist scanning, and offline single-asset backtesting. See [scanner contracts](doc/scanner.md). Local paper trading is implemented with simulated accounts/orders only; see [paper contracts](doc/paper.md). See [backtesting limits](doc/backtesting.md). The foreground [main runner](doc/runner.md) combines scanner/paper cycles with persistent-account resume and console summaries; it does not change fill timing or install schedules.
 
 ## GitHub rules
 - Use GitHub issues and pull requests for all changes.
