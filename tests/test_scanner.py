@@ -46,7 +46,7 @@ def instrument(
 
 
 def watchlist(tmp_path: Path, *items: Instrument) -> Watchlist:
-    return Watchlist(tmp_path / "state", items or (instrument(),), 3, 0)
+    return Watchlist(tmp_path / "state", items or (instrument(),), 3, 0, True)
 
 
 class FakeProvider:
@@ -607,3 +607,259 @@ def test_cli_busy_and_invalid_configuration_exit_codes(
     path.write_text("invalid JSON")
     assert cli.main() == 1
     assert json.loads(capsys.readouterr().err)["status"] == "error"
+
+
+def test_reports_are_optional_and_markdown_is_not_stored(tmp_path: Path) -> None:
+    from crow_trading.scanner.export import export_reports
+
+    config = replace(watchlist(tmp_path), export_reports=False)
+    provider = FakeProvider()
+    result = scan(config, clock=lambda: NOW, fetcher=provider)
+    assert result.report is not None and not result.report_files
+    assert not (config.state_dir / "reports").exists()
+    with sqlite3.connect(config.state_dir / "scanner.sqlite3") as db:
+        assert db.execute("SELECT report_md FROM runs").fetchone()[0] == ""
+        canonical = db.execute("SELECT report_json FROM runs").fetchone()[0]
+    output = tmp_path / "export"
+    exported = export_reports(config.state_dir, output)
+    assert len(exported["report_files"]) == 3
+    assert (output / "000001.json").read_text() == canonical
+    assert "Daily scanner report" in (output / "000001.md").read_text()
+    assert (
+        json.loads((output / "failure-streaks.json").read_text())["failure_streaks"]
+        == []
+    )
+    (output / "000001.md").write_text("my notes")
+    assert scan(config, clock=lambda: NOW, fetcher=provider).report is None
+    assert (output / "000001.md").read_text() == "my notes"
+    with pytest.raises(FileExistsError):
+        export_reports(config.state_dir, output)
+
+
+@pytest.mark.parametrize("automatic", [False, True])
+def test_failure_only_scans_coalesce_across_restart_and_recover(
+    tmp_path: Path, automatic: bool
+) -> None:
+    from crow_trading.scanner.export import export_reports
+
+    config = replace(watchlist(tmp_path), export_reports=automatic)
+    provider = FakeProvider()
+    provider.failures["btc"] = [DataError("unsupported symbol")] * 3
+    for index in range(3):
+
+        def clock(instant: datetime = NOW + timedelta(minutes=index)) -> datetime:
+            return instant
+
+        result = scan(config, clock=clock, fetcher=provider)
+        assert result.exit_code == 1 and result.report is not None
+        assert result.report["failure_summary"]["occurrences"] == index + 1
+        assert result.report["run_id"] == 1
+        assert count(config.state_dir, "runs") == 1
+    with sqlite3.connect(config.state_dir / "scanner.sqlite3") as db:
+        first = db.execute("SELECT report_json FROM runs").fetchone()[0]
+        assert json.loads(first)["as_of"] == NOW.isoformat()
+    recovered = scan(config, clock=lambda: NOW + timedelta(minutes=3), fetcher=provider)
+    assert recovered.exit_code == 0 and count(config.state_dir, "runs") == 2
+    assert recovered.report is not None and len(recovered.report["signals"]) == 2
+    export_reports(config.state_dir, tmp_path / "export")
+    streak = json.loads((tmp_path / "export/failure-streaks.json").read_text())[
+        "failure_streaks"
+    ][0]
+    assert streak["occurrences"] == 3
+    assert streak["first_seen"] == NOW.isoformat()
+    assert streak["last_seen"] == (NOW + timedelta(minutes=2)).isoformat()
+    assert streak["ended_at"] == (NOW + timedelta(minutes=3)).isoformat()
+    with sqlite3.connect(config.state_dir / "scanner.sqlite3") as db:
+        assert (
+            db.execute("SELECT report_json FROM runs WHERE id=1").fetchone()[0] == first
+        )
+
+
+def test_changed_failure_and_mixed_progress_are_not_coalesced(tmp_path: Path) -> None:
+    config = replace(
+        watchlist(tmp_path, instrument(), instrument("eth")), export_reports=False
+    )
+    provider = FakeProvider()
+    provider.failures["btc"] = [DataError("bad symbol")] * 4
+    first = scan(config, clock=lambda: NOW, fetcher=provider)
+    assert first.report is not None and first.report["status"] == "partial_failure"
+    assert "failure_summary" not in first.report  # Healthy progress must be retained.
+    second = scan(config, clock=lambda: NOW + timedelta(minutes=1), fetcher=provider)
+    assert (
+        second.report is not None
+        and second.report["failure_summary"]["occurrences"] == 1
+    )
+    provider.failures["btc"] = [DataError("different error")]
+    third = scan(config, clock=lambda: NOW + timedelta(minutes=2), fetcher=provider)
+    assert (
+        third.report is not None and third.report["run_id"] != second.report["run_id"]
+    )
+    assert count(config.state_dir, "runs") == 3
+
+
+def test_failure_counter_rolls_back_and_rejects_backwards_clock(tmp_path: Path) -> None:
+    config = replace(watchlist(tmp_path), export_reports=False)
+    provider = FakeProvider()
+    provider.failures["btc"] = [DataError("offline")] * 3
+    scan(config, clock=lambda: NOW, fetcher=provider)
+    with State(config.state_dir) as state:
+        content = json.loads(
+            state.connection.execute("SELECT report_json FROM runs").fetchone()[0]
+        )
+        active = state.rows_active_failure()
+        assert active is not None
+        state.report(content, failure_signature=active["signature"])
+        assert state.failure_summaries()[0]["occurrences"] == 2
+        # No commit: simulate interruption of the failed tick.
+    with State(config.state_dir) as state:
+        assert state.failure_summaries()[0]["occurrences"] == 1
+    with pytest.raises(DataError, match="last failure observation"):
+        scan(config, clock=lambda: NOW - timedelta(minutes=1), fetcher=provider)
+
+
+def test_schema1_upgrade_preserves_published_report_bytes(tmp_path: Path) -> None:
+    from crow_trading.scanner.export import export_reports
+
+    config = replace(watchlist(tmp_path), export_reports=False)
+    scan(config, clock=lambda: NOW, fetcher=FakeProvider())
+    with sqlite3.connect(config.state_dir / "scanner.sqlite3") as db:
+        db.execute("DROP TABLE failure_streaks")
+        db.execute("PRAGMA user_version=1")
+        db.execute("UPDATE runs SET report_md='legacy rendered markdown\n'")
+        original = db.execute("SELECT report_json,report_md FROM runs").fetchone()
+    with State(config.state_dir) as state:
+        assert state.connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        # Rollback must include the migration itself.
+    with sqlite3.connect(config.state_dir / "scanner.sqlite3") as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 1
+    export_reports(config.state_dir, tmp_path / "export")
+    with sqlite3.connect(config.state_dir / "scanner.sqlite3") as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert (
+            db.execute("SELECT report_json,report_md FROM runs").fetchone() == original
+        )
+    assert (tmp_path / "export/000001.json").read_text() == original[0]
+    assert (tmp_path / "export/000001.md").read_text() == original[1]
+
+
+def test_explicit_export_cli_and_missing_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from crow_trading.scanner.__main__ import main
+
+    config = replace(watchlist(tmp_path), export_reports=False)
+    scan(config, clock=lambda: NOW, fetcher=FakeProvider())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "scanner",
+            "export",
+            "--state",
+            str(config.state_dir),
+            "--output",
+            str(tmp_path / "export"),
+        ],
+    )
+    assert main() == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "exported"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "scanner",
+            "export",
+            "--state",
+            str(tmp_path / "missing"),
+            "--output",
+            str(tmp_path / "unused"),
+        ],
+    )
+    assert main() == 1
+    assert "does not exist" in capsys.readouterr().err
+    assert not (tmp_path / "missing").exists() and not (tmp_path / "unused").exists()
+
+
+def test_export_setting_is_optional_strict_and_not_in_instrument_policy(
+    tmp_path: Path,
+) -> None:
+    raw = json.loads(
+        (Path(__file__).parents[1] / "examples/scanner/watchlist.json").read_text()
+    )
+    raw.pop("export_reports", None)
+    path = tmp_path / "watchlist.json"
+    path.write_text(json.dumps(raw))
+    config = read_watchlist(path)
+    assert config.export_reports is False
+    raw["export_reports"] = True
+    path.write_text(json.dumps(raw))
+    enabled = read_watchlist(path)
+    assert enabled.export_reports is True
+    assert config.instruments[0].policy_hash == enabled.instruments[0].policy_hash
+    raw["export_reports"] = "false"
+    path.write_text(json.dumps(raw))
+    with pytest.raises(DataError, match="must be boolean"):
+        read_watchlist(path)
+
+
+def test_successful_no_change_tick_closes_failure_streak(tmp_path: Path) -> None:
+    config = replace(watchlist(tmp_path), export_reports=False)
+    provider = FakeProvider()
+    scan(config, clock=lambda: NOW, fetcher=provider)
+    provider.failures["btc"] = [DataError("offline")]
+    failure = scan(
+        config, clock=lambda: NOW + timedelta(minutes=1), fetcher=provider, refresh=True
+    )
+    assert failure.report is not None
+    assert failure.report["failure_summary"]["occurrences"] == 1
+    recovery = scan(config, clock=lambda: NOW + timedelta(minutes=2), fetcher=provider)
+    assert recovery.exit_code == 0 and recovery.report is None
+    with State(config.state_dir) as state:
+        assert (
+            state.failure_summaries()[0]["ended_at"]
+            == (NOW + timedelta(minutes=2)).isoformat()
+        )
+    provider.failures["btc"] = [DataError("offline")]
+    later = scan(
+        config, clock=lambda: NOW + timedelta(minutes=3), fetcher=provider, refresh=True
+    )
+    assert (
+        later.report is not None and later.report["run_id"] != failure.report["run_id"]
+    )
+    assert later.report["failure_summary"]["occurrences"] == 1
+
+
+def test_future_scanner_schema_is_rejected_unchanged(tmp_path: Path) -> None:
+    config = replace(watchlist(tmp_path), export_reports=False)
+    scan(config, clock=lambda: NOW, fetcher=FakeProvider())
+    path = config.state_dir / "scanner.sqlite3"
+    with sqlite3.connect(path) as db:
+        db.execute("PRAGMA user_version=3")
+    before = path.read_bytes()
+    with pytest.raises(DataError, match="unsupported scanner state version"):
+        with State(config.state_dir):
+            pytest.fail("future schema accepted")
+    assert path.read_bytes() == before
+
+
+def test_cli_export_flag_opts_in_without_changing_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from functools import partial
+
+    from crow_trading.scanner import __main__ as cli
+
+    raw = json.loads(
+        (Path(__file__).parents[1] / "examples/scanner/watchlist.json").read_text()
+    )
+    raw["state_dir"] = str(tmp_path / "state")
+    path = tmp_path / "watchlist.json"
+    path.write_text(json.dumps(raw))
+    before = path.read_bytes()
+    monkeypatch.setattr(
+        cli, "scan", partial(scan, clock=lambda: NOW, fetcher=FakeProvider())
+    )
+    monkeypatch.setattr(sys, "argv", ["scanner", str(path), "--export-reports"])
+    assert cli.main() == 0
+    assert len(json.loads(capsys.readouterr().out)["report_files"]) == 2
+    assert path.read_bytes() == before

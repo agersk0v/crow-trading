@@ -104,3 +104,8 @@ Full ledger reconciliation still runs before processing and reporting, including
 historical accounts outside the selected configuration. It still reads history;
 this cleanup reduces reporting copies rather than making total cycle cost
 independent of history. Full inspect/export commands remain available.
+
+Scanner report files are off by default; SQLite still holds signals/reports.
+Repeated identical failure-only scans print their observation count and first-seen
+time, while each cycle still reports the current error. See [storage](storage.md)
+for explicit exports, optional automatic files, backups, and upgrade behavior.

@@ -19,7 +19,6 @@ from crow_trading.scanner.config import (
 )
 from crow_trading.scanner.datasets import check_source, context_hash, merge
 from crow_trading.scanner.providers import Fetcher, Providers, fetch_retry
-from crow_trading.scanner.reports import markdown
 from crow_trading.scanner.state import State
 from crow_trading.scanner.timing import Due, due_sessions, request_window
 
@@ -207,7 +206,7 @@ def scan(
     requested_providers: set[tuple[str, str]] = set()
     report: dict[str, Any] | None = None
     with State(watchlist.state_dir) as state:
-        files = state.export()  # Recover previously committed reports before new work.
+        files = state.export() if watchlist.export_reports else []
         for item in watchlist.instruments:
             try:
                 with state.asset():
@@ -306,8 +305,32 @@ def scan(
                         and r["data_mode"] == "snapshot"
                     ],
                 },
-                markdown,
+                failure_signature=digest(
+                    {
+                        "policies": [
+                            item.policy_hash for item in watchlist.instruments
+                        ],
+                        "statuses": [
+                            {
+                                key: status.get(key)
+                                for key in (
+                                    "instrument",
+                                    "identity",
+                                    "status",
+                                    "error",
+                                    "last_successful_candle",
+                                )
+                            }
+                            for status in statuses
+                        ],
+                    }
+                )
+                if errors and not records and not updates
+                else None,
             )
+        else:
+            state.close_failure(finished.isoformat())
         state.commit()  # No progress without the associated report payload.
-        files.extend(state.export())
+        if watchlist.export_reports:
+            files.extend(state.export())
     return ScanResult(report, tuple(statuses), tuple(files), int(errors), finished)

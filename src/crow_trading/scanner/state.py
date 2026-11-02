@@ -4,12 +4,14 @@ import json
 import os
 import sqlite3
 import tempfile
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from crow_trading.data.models import DataError
+from crow_trading.scanner.reports import markdown
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS instruments (
@@ -24,6 +26,10 @@ CREATE INDEX IF NOT EXISTS signal_candles ON signals(identity, candle_timestamp)
 CREATE TABLE IF NOT EXISTS runs (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  report_json TEXT NOT NULL, report_md TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS failure_streaks (
+ run_id INTEGER PRIMARY KEY, signature TEXT NOT NULL, first_seen TEXT NOT NULL,
+ last_seen TEXT NOT NULL, occurrences INTEGER NOT NULL, ended_at TEXT
 );
 """
 
@@ -52,7 +58,7 @@ class State:
                 "SELECT name FROM sqlite_master WHERE type='table' "
                 "AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
-            if version not in (0, 1):
+            if version not in (0, 1, 2):
                 raise DataError("unsupported scanner state version")
             if application not in (0, 1129477971) or (application == 0 and tables):
                 raise DataError("refusing to modify an unrelated SQLite database")
@@ -60,7 +66,7 @@ class State:
                 if statement.strip():
                     connection.execute(statement)
             connection.execute("PRAGMA application_id=1129477971")
-            connection.execute("PRAGMA user_version=1")
+            connection.execute("PRAGMA user_version=2")
         except Exception as exc:
             connection.close()
             self.db = None
@@ -132,33 +138,95 @@ class State:
             (identity, policy_hash, last, path, fingerprint),
         )
 
+    def close_failure(self, now: str) -> None:
+        active = self.rows_active_failure()
+        if active and datetime.fromisoformat(now) < datetime.fromisoformat(
+            active["last_seen"]
+        ):
+            raise DataError("scan clock precedes the last failure observation")
+        self.connection.execute(
+            "UPDATE failure_streaks SET ended_at=? WHERE ended_at IS NULL", (now,)
+        )
+
     def report(
-        self, content: dict[str, Any], render: Callable[[dict[str, Any]], str]
+        self, content: dict[str, Any], *, failure_signature: str | None = None
     ) -> dict[str, Any]:
+        now = content["as_of"]
+        active = self.rows_active_failure()
+        if active and datetime.fromisoformat(now) < datetime.fromisoformat(
+            active["last_seen"]
+        ):
+            raise DataError("scan clock precedes the last failure observation")
+        if active and failure_signature == active["signature"]:
+            self.connection.execute(
+                "UPDATE failure_streaks SET last_seen=?,occurrences=occurrences+1 "
+                "WHERE run_id=?",
+                (now, active["run_id"]),
+            )
+            return {
+                **content,
+                "run_id": active["run_id"],
+                "failure_summary": {
+                    "first_seen": active["first_seen"],
+                    "last_seen": now,
+                    "occurrences": active["occurrences"] + 1,
+                },
+            }
+        self.close_failure(now)
         cursor = self.connection.execute(
             "INSERT INTO runs(report_json,report_md) VALUES ('','')"
         )
         content = {**content, "run_id": cursor.lastrowid}
         self.connection.execute(
-            "UPDATE runs SET report_json=?, report_md=? WHERE id=?",
-            (
-                json.dumps(content, sort_keys=True, indent=2) + "\n",
-                render(content),
-                cursor.lastrowid,
-            ),
+            "UPDATE runs SET report_json=? WHERE id=?",
+            (json.dumps(content, sort_keys=True, indent=2) + "\n", cursor.lastrowid),
         )
+        if failure_signature is not None:
+            self.connection.execute(
+                "INSERT INTO failure_streaks VALUES (?,?,?,?,?,NULL)",
+                (cursor.lastrowid, failure_signature, now, now, 1),
+            )
+            content = {
+                **content,
+                "failure_summary": {
+                    "first_seen": now,
+                    "last_seen": now,
+                    "occurrences": 1,
+                },
+            }
         return content
+
+    def rows_active_failure(self) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM failure_streaks WHERE ended_at IS NULL"
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+    def failure_summaries(self) -> list[dict[str, Any]]:
+        return [
+            dict(row)
+            for row in self.connection.execute(
+                "SELECT run_id,first_seen,last_seen,occurrences,ended_at "
+                "FROM failure_streaks ORDER BY run_id"
+            )
+        ]
 
     def commit(self) -> None:
         self.connection.commit()
 
-    def export(self) -> list[str]:
+    def export(self, destination: Path | None = None) -> list[str]:
         """Repair missing projections without overwriting conflicting user files."""
         repaired: list[str] = []
         for row in self.connection.execute("SELECT * FROM runs ORDER BY id").fetchall():
             for suffix, column in (("json", "report_json"), ("md", "report_md")):
-                path = self.root / "reports" / f"{row['id']:06d}.{suffix}"
-                content = row[column].encode("utf-8")
+                path = (
+                    destination or self.root / "reports"
+                ) / f"{row['id']:06d}.{suffix}"
+                content = (
+                    row[column]
+                    if suffix == "json" or row[column]
+                    else markdown(json.loads(row["report_json"]))
+                ).encode("utf-8")
                 if path.exists():
                     if path.read_bytes() != content:
                         raise DataError(

@@ -53,16 +53,16 @@ policy is immutable: changing capital, strategy parameters, risk limits, assets,
 or mode requires a new account ID or a future explicit migration. Old accounts,
 inputs, and reports remain untouched. Paths are relative to the configuration.
 FX/action input contents may be refreshed at the configured locations; every
-used version is content-hashed and copied to `data/paper/inputs/`.
+used version is content-hashed and copied to `data/paper/inputs/`. Immutable price archives use hard links when supported,
+with verified-copy fallback; see [storage rules](storage.md).
 
 An initial step may produce only ignored holds/exits or expired-signal decisions.
 That is valid. A fresh entry creates a pending simulated order and reserves
 buying power; it does not create an immediate fill. See the timing model below.
 
 Run a scanner tick and then a paper step when new observations are available.
-Both commands exit; no continuously running service is needed for this daily-bar
-model. They can be invoked every 15 minutes using the existing scheduling
-approach. A scanner partial failure does not invent fresh data: the paper worker
+Both commands exit. The combined runner invokes them every five minutes after
+completion; separate one-shot invocations every 15 minutes also suit daily bars. A scanner partial failure does not invent fresh data: the paper worker
 validates signals and marks independently. Do not change or activate your
 existing scheduled task without deciding explicitly to enable paper processing.
 No task, daemon, notification, or unattended deployment is installed by this PR.
@@ -217,7 +217,7 @@ processing for investigation instead of guessing or silently repairing money.
 Archive references preserve every used Parquet/FX/action input under `inputs/`.
 A failed transaction can leave harmless unreferenced files. Do not edit database
 rows or published input files. Back up the entire state directory while idle;
-local storage grows without pruning. Keep the scanner state and source provenance
+local storage grows without pruning. See [backup and safe cleanup](storage.md). Keep the scanner state and source provenance
 when moving the workflow. No PostgreSQL, Kubernetes, or object-storage migration
 is part of this phase.
 

@@ -59,10 +59,9 @@ class Source:
         try:
             db.row_factory = sqlite3.Row
             db.execute("BEGIN")
-            if (
-                db.execute("PRAGMA application_id").fetchone()[0] != 1129477971
-                or db.execute("PRAGMA user_version").fetchone()[0] != 1
-            ):
+            application = db.execute("PRAGMA application_id").fetchone()[0]
+            version = db.execute("PRAGMA user_version").fetchone()[0]
+            if application != 1129477971 or version not in (1, 2):
                 raise DataError("unsupported scanner database")
             self.signals = [
                 json.loads(row[0])
@@ -129,7 +128,14 @@ class Source:
                 data, {**action, "start": str(req.start), "end": str(req.end)}
             )
             self.actions[identity] = action
-        save(data, self.config.state_dir / "inputs" / (fingerprint(data) + ".parquet"))
+        target = self.config.state_dir / "inputs" / (fingerprint(data) + ".parquet")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.link(absolute, target)
+        except OSError:
+            # Existing archives are verified by save; cross-filesystem links fall back
+            # to an independent immutable copy with the same integrity checks.
+            save(data, target)
         return data
 
     def fx(self, account: Account) -> FXBook:
